@@ -14,7 +14,16 @@ from .serializers import (
 from drf_spectacular.utils import extend_schema, OpenApiExample
 
 # DTOs se importan desde api.model.dto
-from api.model.dto import *
+from api.model.dto import (
+    PredictRequest, PredictResponse, PredictResponseBond,
+    PredictSingleRequest, PredictSingleResponse,
+    PredictMultipleRequest, PredictMultipleResponse, PredictMultipleBond,
+    FragmentSmilesRequest, FragmentSmilesResponse,
+    FragmentXYZRequest, FragmentXYZResponse,
+    PredictCheckRequest, PredictCheckResponse,
+    InferAllRequest, InferAllResponse, InferAllBond,
+    DownloadReportRequest, DownloadReportResponse
+)
 
 MOCK_IMAGE = "data:image/png;base64,iVBORw0KGgo..."
 

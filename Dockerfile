@@ -9,9 +9,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY requirements.txt /app/
-COPY DeepBDE-Fork/requirements.txt /app/DeepBDE-Fork/
+COPY deepbde/requirements.txt /app/deepbde/
 RUN pip install --upgrade pip && \
-    pip install -r DeepBDE-Fork/requirements.txt && \
+    pip install -r deepbde/requirements.txt && \
     pip cache purge && \
     pip install -r requirements.txt
 

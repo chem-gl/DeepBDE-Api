@@ -7,7 +7,6 @@ from api.model.dto import (
 # Controlador para predicción general, single y multiple
 
 def predict_bde_controller(request: PredictRequest) -> PredictResponse:
-    # Aquí iría la lógica real de predicción
     # MOCK
     return PredictResponse(
         image="data:image/png;base64,iVBORw0KGgo...",
