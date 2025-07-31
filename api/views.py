@@ -11,7 +11,27 @@ from .serializers import (
     InferAllSerializer,
     DownloadReportSerializer
 )
+
 from drf_spectacular.utils import extend_schema, OpenApiExample
+
+# Importar controladores
+from api.controllers.predict_controller import (
+    predict_bde_controller,
+    predict_single_bde_controller,
+    predict_multiple_bde_controller
+)
+from api.controllers.fragment_controller import (
+    fragment_smiles_controller,
+    fragment_xyz_controller
+)
+from api.controllers.check_controller import predict_check_controller
+from api.controllers.infer_controller import infer_all_controller
+from api.controllers.info_controller import (
+    info_controller,
+    status_controller,
+    metrics_controller
+)
+from api.controllers.report_controller import download_report_controller
 
 # DTOs se importan desde api.model.dto
 from api.model.dto import (
@@ -30,35 +50,43 @@ MOCK_IMAGE = "data:image/png;base64,iVBORw0KGgo..."
 
 class PredictView(APIView):
     """
-    Endpoint para predecir las energías de disociación de enlaces (BDE) y mostrar la estructura 2D de la molécula dada (SMILES).
-    Devuelve una imagen y la lista de enlaces con sus BDEs.
+    Endpoint para obtener la imagen 2D de la molécula y la lista de enlaces con sus índices y átomos involucrados (sin predecir BDEs).
     ---
-    Endpoint to predict bond dissociation energies (BDE) and display the 2D structure for the given molecule (SMILES).
-    Returns an image and the list of bonds with their BDEs.
+    Endpoint to get the 2D image of the molecule and the list of bonds with their indices and atoms (no BDE prediction).
     """
     @extend_schema(
-        description="Predice las energías de disociación de enlaces (BDE) y muestra la estructura 2D de la molécula dada (SMILES).\n\nPredicts bond dissociation energies (BDE) and displays the 2D structure for the given molecule (SMILES).",
+        description="Devuelve la imagen 2D de la molécula y la lista de enlaces con sus índices y átomos involucrados (sin predecir BDEs).\n\nReturns the 2D image of the molecule and the list of bonds with their indices and atoms (no BDE prediction).",
         request=PredictSerializer,
         responses={200: PredictSerializer},
         examples=[
-            OpenApiExample('Etanol', value={"smiles": "CCO"}, request_only=True),
-            OpenApiExample('Benceno', value={"smiles": "c1ccccc1"}, request_only=True),
-            OpenApiExample('Metano', value={"smiles": "C"}, request_only=True),
-            OpenApiExample('Cafeína', value={"smiles": "Cn1cnc2c1c(=O)n(C)c(=O)n2C"}, request_only=True),
-            OpenApiExample('Taxol', value={"smiles": "CC1=C2C(=CC(=O)OC2=CC3=C1C(=O)OC3)OC"}, request_only=True),
-            OpenApiExample('Colesterol', value={"smiles": "CC(C)CCCC(C)C1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C"}, request_only=True),
-            OpenApiExample('Morfina', value={"smiles": "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5"}, request_only=True),
-            OpenApiExample('Punto', value={"smiles": "."}, request_only=True)
+            OpenApiExample(
+                'Etanol',
+                value={
+                    "status": "success",
+                    "data": {
+                        "image": MOCK_IMAGE,
+                        "bonds": [
+                            {"idx": 0, "atoms": [0,1], "bde": None},
+                            {"idx": 1, "atoms": [1,2], "bde": None}
+                        ]
+                    },
+                    "error": None
+                },
+                response_only=True
+            )
         ]
     )
     def post(self, request):
         serializer = PredictSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # Llama al controlador
+        dto = PredictRequest(**serializer.validated_data)
+        result = predict_bde_controller(dto)
         return Response({
             "status": "success",
             "data": {
-                "image": MOCK_IMAGE,
-                "bonds": [{"idx": 1, "atoms": [0,1], "bde": 113.4}]
+                "image": result.image,
+                "bonds": [bond.__dict__ for bond in result.bonds]
             },
             "error": None
         })
@@ -87,9 +115,11 @@ class PredictSingleView(APIView):
     def post(self, request):
         serializer = PredictSingleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        dto = PredictSingleRequest(**serializer.validated_data)
+        result = predict_single_bde_controller(dto)
         return Response({
             "status": "success",
-            "data": {"bde": 113.7},
+            "data": {"bde": result.bde},
             "error": None
         })
 
@@ -116,12 +146,11 @@ class PredictMultipleView(APIView):
     def post(self, request):
         serializer = PredictMultipleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        dto = PredictMultipleRequest(**serializer.validated_data)
+        result = predict_multiple_bde_controller(dto)
         return Response({
             "status": "success",
-            "data": {"bonds": [
-                {"idx": 1, "bde": 112.3},
-                {"idx": 2, "bde": 110.5}
-            ]},
+            "data": {"bonds": [bond.__dict__ for bond in result.bonds]},
             "error": None
         })
 
@@ -150,15 +179,14 @@ class FragmentSmilesView(APIView):
     def post(self, request):
         serializer = FragmentSmilesSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        dto = FragmentSmilesRequest(**serializer.validated_data)
+        result = fragment_smiles_controller(dto)
         return Response({
             "status": "success",
             "data": {
-                "parent": "CCO",
-                "fragments": ["[CH3]", "[OH]"],
-                "all_fragments": [
-                    {"bond_idx": 0, "fragments": ["CC", "O"]},
-                    {"bond_idx": 1, "fragments": ["C", "CO"]}
-                ]
+                "parent": result.parent,
+                "fragments": result.fragments,
+                "all_fragments": result.all_fragments
             },
             "error": None
         })
@@ -188,10 +216,11 @@ class FragmentXYZView(APIView):
     def post(self, request):
         serializer = FragmentXYZSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        xyz = "3\n\nC 0.000 0.000 0.000\nC 1.200 0.000 0.000\nO 2.400 0.000 0.000\n\n1\n\nO 0.000 0.000 0.000"
+        dto = FragmentXYZRequest(**serializer.validated_data)
+        result = fragment_xyz_controller(dto)
         return Response({
             "status": "success",
-            "data": xyz,
+            "data": result.xyz,
             "error": None
         })
 
@@ -215,21 +244,23 @@ class PredictCheckView(APIView):
     def post(self, request):
         serializer = PredictCheckSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        products = serializer.validated_data.get('products', [])
-        if products != ["[CH3]", "[OH]"]:
+        dto = PredictCheckRequest(**serializer.validated_data)
+        try:
+            result = predict_check_controller(dto)
+            return Response({
+                "status": "success",
+                "data": {"bde": result.bde},
+                "error": None
+            })
+        except Exception as e:
             return Response({
                 "status": "error",
                 "data": None,
                 "error": {
                     "code": "ERR_PRODUCTS_MISMATCH",
-                    "message": "Los productos no corresponden al corte indicado."
+                    "message": str(e)
                 }
             }, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        return Response({
-            "status": "success",
-            "data": {"bde": 113.7},
-            "error": None
-        })
 
 class InferAllView(APIView):
     """
@@ -254,12 +285,11 @@ class InferAllView(APIView):
     def post(self, request):
         serializer = InferAllSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        dto = InferAllRequest(**serializer.validated_data)
+        result = infer_all_controller(dto)
         return Response({
             "status": "success",
-            "data": {"bonds": [
-                {"idx": 0, "bde": 110.2},
-                {"idx": 1, "bde": 112.3}
-            ]},
+            "data": {"bonds": [bond.__dict__ for bond in result.bonds]},
             "error": None
         })
 
@@ -277,13 +307,10 @@ class InfoView(APIView):
         ]
     )
     def get(self, request):
+        data = info_controller()
         return Response({
             "status": "success",
-            "data": {
-                "model_version": "v1.0.2",
-                "arxiv": "https://arxiv.org/abs/2306.12345",
-                "loaded_at": "2025-07-30T13:00:00Z"
-            },
+            "data": data,
             "error": None
         })
 
@@ -301,13 +328,10 @@ class StatusView(APIView):
         ]
     )
     def get(self, request):
+        data = status_controller()
         return Response({
             "status": "success",
-            "data": {
-                "deepbde_submodule": "initialized",
-                "gpu_available": True,
-                "uptime": "2h34m"
-            },
+            "data": data,
             "error": None
         })
 
@@ -325,8 +349,8 @@ class MetricsView(APIView):
         ]
     )
     def get(self, request):
-        # Mock Prometheus metrics
-        return Response("# HELP deepbde_requests_total Total requests\n# TYPE deepbde_requests_total counter\ndeepbde_requests_total 42", content_type="text/plain")
+        metrics = metrics_controller()
+        return Response(metrics, content_type="text/plain")
 
 class DownloadReportView(APIView):
     """
@@ -351,18 +375,20 @@ class DownloadReportView(APIView):
     def post(self, request):
         serializer = DownloadReportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        fmt = serializer.validated_data.get('format', '').lower()
-        if fmt != 'pdf':
+        dto = DownloadReportRequest(**serializer.validated_data)
+        try:
+            result = download_report_controller(dto)
+            return Response({
+                "status": "success",
+                "data": result.data,
+                "error": None
+            })
+        except Exception as e:
             return Response({
                 "status": "error",
                 "data": None,
                 "error": {
                     "code": "ERR_REPORT_FAILED",
-                    "message": "Solo se soporta formato PDF."
+                    "message": str(e)
                 }
             }, status=status.HTTP_400_BAD_REQUEST)
-        return Response({
-            "status": "success",
-            "data": "PDF generado (mock)",
-            "error": None
-        })
