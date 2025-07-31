@@ -20,5 +20,7 @@ COPY . /app
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 EXPOSE 8000
+
 RUN pip install dgl==1.1.2 -f https://data.dgl.ai/wheels/torch-2.3/repo.html
+
 ENTRYPOINT ["/entrypoint.sh"]

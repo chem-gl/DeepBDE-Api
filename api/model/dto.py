@@ -13,29 +13,36 @@ class PredictRequest:
     """
     smiles: str
 
-
-@dataclass
-class PredictResponseBond:
-    """
-    Representa un enlace de la molécula:
-    - idx: índice del enlace (RDKit)
-    - atoms: índices de los átomos que conecta
-    - bde: energía de disociación (opcional, solo en endpoints de predicción)
-    """
-    idx: int
-    atoms: List[int]
-    bde: Optional[float] = None
-
-
+ 
 @dataclass
 class PredictResponse:
     """
     Respuesta de /predict/:
-    - image: imagen 2D en base64
-    - bonds: lista de enlaces (sin BDE)
+    - smiles_canonical: SMILES canónico de la molécula ingresada.
+    - image_svg: Imagen SVG enriquecida con la información de átomos y enlaces.
+    - canvas: Metadatos del lienzo de dibujo, por ejemplo: {"width": 300, "height": 300}.
+    - atoms: Diccionario con las posiciones de cada átomo en el canvas, ejemplo:
+        {
+            "0": {"x": 123.45, "y": 67.89},
+            "1": {"x": 156.78, "y": 120.34},
+            ...
+        }
+    - bonds: Diccionario con las posiciones de cada enlace, ejemplo:
+        {
+            "0": {
+                "start": {"x": 123.45, "y": 67.89},
+                "end":   {"x": 156.78, "y": 120.34}
+            },
+            ...
+        }
+    - mol_id: ID único asociado al SMILES canónico de la molécula (hash SHA256 truncado).
     """
-    image: str
-    bonds: List[PredictResponseBond]
+    smiles_canonical: str
+    image_svg: str
+    canvas: Dict[str, int]
+    atoms: Dict[str, Dict[str, float]]
+    bonds: Dict[str, Dict[str, Dict[str, float]]]
+    mol_id: str
 
 
 @dataclass

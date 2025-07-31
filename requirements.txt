@@ -3,7 +3,7 @@ Django>=4.2
 djangorestframework
 rdkit
 torch
-numpy
+numpy<=2
 pandas
 pillow
 dgl

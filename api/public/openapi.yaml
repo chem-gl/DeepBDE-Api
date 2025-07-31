@@ -479,9 +479,9 @@ paths:
     post:
       operationId: v1_predict_create
       description: |-
-        Predice las energías de disociación de enlaces (BDE) y muestra la estructura 2D de la molécula dada (SMILES).
+        Devuelve información enriquecida de la molécula: SMILES canónico, imagen SVG, metadatos de canvas, posiciones de átomos y enlaces, id único y SMILES de cada átomo.
 
-        Predicts bond dissociation energies (BDE) and displays the 2D structure for the given molecule (SMILES).
+        Returns enriched molecule information: canonical SMILES, SVG image, canvas metadata, atom and bond positions, unique id, and atom SMILES.
       tags:
       - v1
       requestBody:
@@ -489,31 +489,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Predict'
-            examples:
-              Etanol:
-                value:
-                  smiles: CCO
-              Benceno:
-                value:
-                  smiles: c1ccccc1
-              Metano:
-                value:
-                  smiles: C
-              Cafeína:
-                value:
-                  smiles: Cn1cnc2c1c(=O)n(C)c(=O)n2C
-              Taxol:
-                value:
-                  smiles: CC1=C2C(=CC(=O)OC2=CC3=C1C(=O)OC3)OC
-              Colesterol:
-                value:
-                  smiles: CC(C)CCCC(C)C1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C
-              Morfina:
-                value:
-                  smiles: CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5
-              Punto:
-                value:
-                  smiles: .
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/Predict'
@@ -527,11 +502,7 @@ paths:
       - {}
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Predict'
-          description: ''
+          description: No response body
   /api/v1/predict/check/:
     post:
       operationId: v1_predict_check_create

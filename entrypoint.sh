@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+export PYTHONPATH=/app/deepbde:$PYTHONPATH
 
 # Export OpenAPI YAML to public folder before starting the server
 python manage.py spectacular --file api/public/openapi.yaml

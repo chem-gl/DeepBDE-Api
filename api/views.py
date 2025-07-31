@@ -35,14 +35,14 @@ from api.controllers.report_controller import download_report_controller
 
 # DTOs se importan desde api.model.dto
 from api.model.dto import (
-    PredictRequest, PredictResponse, PredictResponseBond,
-    PredictSingleRequest, PredictSingleResponse,
-    PredictMultipleRequest, PredictMultipleResponse, PredictMultipleBond,
-    FragmentSmilesRequest, FragmentSmilesResponse,
-    FragmentXYZRequest, FragmentXYZResponse,
-    PredictCheckRequest, PredictCheckResponse,
-    InferAllRequest, InferAllResponse, InferAllBond,
-    DownloadReportRequest, DownloadReportResponse
+    PredictRequest,  
+    PredictSingleRequest,  
+    PredictMultipleRequest,  
+    FragmentSmilesRequest,  
+    FragmentXYZRequest,  
+    PredictCheckRequest, 
+    InferAllRequest,  
+    DownloadReportRequest 
 )
 
 MOCK_IMAGE = "data:image/png;base64,iVBORw0KGgo..."
@@ -55,20 +55,39 @@ class PredictView(APIView):
     Endpoint to get the 2D image of the molecule and the list of bonds with their indices and atoms (no BDE prediction).
     """
     @extend_schema(
-        description="Devuelve la imagen 2D de la molécula y la lista de enlaces con sus índices y átomos involucrados (sin predecir BDEs).\n\nReturns the 2D image of the molecule and the list of bonds with their indices and atoms (no BDE prediction).",
+        description=(
+            "Devuelve información enriquecida de la molécula: SMILES canónico, imagen SVG, metadatos de canvas, "
+            "posiciones de átomos y enlaces, id único y SMILES de cada átomo.\n\n"
+            "Returns enriched molecule information: canonical SMILES, SVG image, canvas metadata, atom and bond positions, unique id, and atom SMILES."
+        ),
         request=PredictSerializer,
-        responses={200: PredictSerializer},
+        responses={200: None},
         examples=[
             OpenApiExample(
                 'Etanol',
                 value={
                     "status": "success",
                     "data": {
-                        "image": MOCK_IMAGE,
-                        "bonds": [
-                            {"idx": 0, "atoms": [0,1], "bde": None},
-                            {"idx": 1, "atoms": [1,2], "bde": None}
-                        ]
+                        "smiles_canonical": "CCO",
+                        "image_svg": "<svg>...</svg>",
+                        "canvas": {"width": 300, "height": 300},
+                        "atoms": {
+                            "0": {"x": 123.45, "y": 67.89},
+                            "1": {"x": 156.78, "y": 120.34},
+                            "2": {"x": 200.00, "y": 150.00}
+                        },
+                        "bonds": {
+                            "0": {
+                                "start": {"x": 123.45, "y": 67.89},
+                                "end": {"x": 156.78, "y": 120.34}
+                            },
+                            "1": {
+                                "start": {"x": 156.78, "y": 120.34},
+                                "end": {"x": 200.00, "y": 150.00}
+                            }
+                        },
+                        "mol_id": "a1b2c3d4e5f6a7b8",
+                        "atom_smiles": ["[C]", "[C]", "[O]"]
                     },
                     "error": None
                 },
@@ -81,15 +100,29 @@ class PredictView(APIView):
         serializer.is_valid(raise_exception=True)
         # Llama al controlador
         dto = PredictRequest(**serializer.validated_data)
-        result = predict_bde_controller(dto)
-        return Response({
-            "status": "success",
-            "data": {
-                "image": result.image,
-                "bonds": [bond.__dict__ for bond in result.bonds]
-            },
-            "error": None
-        })
+        try:
+            result = predict_bde_controller(dto)
+            return Response({
+                "status": "success",
+                "data": {
+                    "smiles_canonical": result.smiles_canonical,
+                    "image_svg": result.image_svg,
+                    "canvas": result.canvas,
+                    "atoms": result.atoms,
+                    "bonds": result.bonds,
+                    "mol_id": result.mol_id
+                },
+                "error": None
+            })
+        except ValueError as e:
+            return Response({
+                "status": "error",
+                "data": None,
+                "error": {
+                    "code": "ERR_INVALID_SMILES",
+                    "message": str(e)
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 class PredictSingleView(APIView):
     """
