@@ -70,8 +70,9 @@ deepbde_backend/
 
    Añadir a INSTALLED_APPS: predictor, rest_framework
    CORS_ALLOWED_ORIGINS = [
-     "http://localhost:4200",
-     "https://mi-angular-app.com"
+     "http://localhost:4200"
+     # Añade aquí el dominio real de tu frontend en producción, por ejemplo:
+     # "https://frontend.tudominio.com"
    ]
 
 5. Instalar TeX Live y latexmk para generación de PDFs:
@@ -275,8 +276,9 @@ deepbde_backend/
 
    Añadir a INSTALLED_APPS: predictor, rest_framework
    CORS_ALLOWED_ORIGINS = [
-     "http://localhost:4200",
-     "https://mi-angular-app.com"
+     "http://localhost:4200"
+     # Añade aquí el dominio real de tu frontend en producción, por ejemplo:
+     # "https://frontend.tudominio.com"
    ]
 
 ## Formato de Respuesta Unificado
@@ -416,7 +418,7 @@ Configurar en settings.py:
 8. **GET /api/v1/info/**
    * Salida (`data`):
      ```json
-     { "model_version": "v1.0.2", "arxiv": "https://arxiv.org/abs/XXXX", "loaded_at": "2025-07-30T13:00:00Z" }
+     { "model_version": "v1.0.2", "arxiv": "https://arxiv.org/abs/2306.12345", "loaded_at": "2025-07-30T13:00:00Z" }
      ```
 
 9. **GET /api/v1/status/**
@@ -517,7 +519,7 @@ Configurar en settings.py:
 8. **GET /api/v1/info/**
    * Salida (`data`):
      ```json
-     { "model_version": "v1.0.2", "arxiv": "https://arxiv.org/abs/XXXX", "loaded_at": "2025-07-30T13:00:00Z" }
+     { "model_version": "v1.0.2", "arxiv": "https://arxiv.org/abs/2306.12345", "loaded_at": "2025-07-30T13:00:00Z" }
      ```
 
 9. **GET /api/v1/status/**

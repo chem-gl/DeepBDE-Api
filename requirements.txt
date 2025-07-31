@@ -1,0 +1,14 @@
+# requirements.txt recomendado para DeepBDE Backend
+Django>=4.2
+djangorestframework
+rdkit
+torch
+numpy
+pandas
+pillow
+dgl
+scikit-learn
+django-tex
+PyJWT
+fpdf2
+drf-spectacular
