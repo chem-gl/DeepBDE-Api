@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'drf_spectacular',
+    'rest_framework',
+    'api',
 ]
 
 MIDDLEWARE = [
@@ -59,7 +61,41 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'DeepBDE API',
-    'DESCRIPTION': 'API para predicción de energías de disociación de enlaces (BDE) usando DeepBDE.',
+    'DESCRIPTION': (
+        'Esta API es completamente bilingüe: Español e Inglés.\n\n'
+        '## Flujo de uso de la API (Español)\n'
+        '1. El usuario envía un SMILES a `/api/v1/predict/` para obtener la imagen 2D y los enlaces con sus índices.\n'
+        '2. Para predecir la BDE de un enlace específico, usa `/api/v1/predict/single/` con el SMILES y el índice del enlace.\n'
+        '3. Para varios enlaces, usa `/api/v1/predict/multiple/` con el SMILES y una lista de índices.\n'
+        '4. Para obtener los fragmentos SMILES de la molécula, usa `/api/v1/fragment/smiles/` (puedes activar `all_bonds` para todos los fragmentos).\n'
+        '5. Para obtener los fragmentos en formato XYZ, usa `/api/v1/fragment/xyz/` (con `all_bonds` si se requiere).\n'
+        '6. Para validar productos de escisión y obtener la BDE, usa `/api/v1/predict/check/`.\n'
+        '7. Para predecir todas las BDE de enlaces simples, usa `/api/v1/infer/all/`.\n'
+        '8. Para descargar un reporte PDF, usa `/api/v1/download_report/`.\n'
+        '9. Para información del modelo, usa `/api/v1/info/`.\n'
+        '10. Para estado del sistema, usa `/api/v1/status/`.\n'
+        '11. Para métricas Prometheus, usa `/api/v1/metrics/`.\n'
+        '\n'
+        '## API usage flow (English)\n'
+        'This API is fully bilingual: Spanish and English.\n\n'
+        '1. The user sends a SMILES to `/api/v1/predict/` to get the 2D image and bonds with their indices.\n'
+        '2. To predict the BDE of a specific bond, use `/api/v1/predict/single/` with the SMILES and bond index.\n'
+        '3. For multiple bonds, use `/api/v1/predict/multiple/` with the SMILES and a list of indices.\n'
+        '4. To get SMILES fragments, use `/api/v1/fragment/smiles/` (enable `all_bonds` for all fragments).\n'
+        '5. To get fragments in XYZ format, use `/api/v1/fragment/xyz/` (with `all_bonds` if needed).\n'
+        '6. To validate cleavage products and get the BDE, use `/api/v1/predict/check/`.\n'
+        '7. To predict all single bond BDEs, use `/api/v1/infer/all/`.\n'
+        '8. To download a PDF report, use `/api/v1/download_report/`.\n'
+        '9. For model info, use `/api/v1/info/`.\n'
+        '10. For system status, use `/api/v1/status/`.\n'
+        '11. For Prometheus metrics, use `/api/v1/metrics/`.\n'
+        '\n'
+        '### Notas:\n'
+        '- El frontend debe mostrar la imagen y enlaces tras `/predict/`, y permitir seleccionar enlaces para `/single/` o `/multiple/`.\n'
+        '- Los checkboxes para fragmentos SMILES/XYZ deben activar el parámetro `all_bonds`.\n'
+        '- El reporte PDF se descarga tras la predicción.\n'
+        '- Todos los endpoints devuelven respuestas con el formato unificado: status, data, error.'
+    ),
     'VERSION': '1.0.0',
 }
 

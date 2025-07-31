@@ -1,4 +1,5 @@
-FROM pytorch/pytorch:2.7.1-cuda11.8-cudnn9-runtime
+FROM pytorch/pytorch:2.3.0-cuda11.8-cudnn8-runtime
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
@@ -14,8 +15,10 @@ RUN pip install --upgrade pip && \
     pip cache purge && \
     pip install -r requirements.txt
 
+
 COPY . /app
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 EXPOSE 8000
+RUN pip install dgl==1.1.2 -f https://data.dgl.ai/wheels/torch-2.3/repo.html
 ENTRYPOINT ["/entrypoint.sh"]

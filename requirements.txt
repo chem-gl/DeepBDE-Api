@@ -12,3 +12,4 @@ django-tex
 PyJWT
 fpdf2
 drf-spectacular
+networkx==2.8.8
