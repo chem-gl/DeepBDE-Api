@@ -103,10 +103,10 @@ class PredictSingleRequest(BaseModel):
 
     @field_validator('bond_idx')
     @classmethod
-    def _validate_bond_idx(cls, v: int) -> int:
-        if v < 0:
-            raise ValueError("bond_idx debe ser >= 0")
-        return v
+    def validate_bond_idx(cls, value):
+        if value < 0:
+            raise ValueError("El índice del enlace debe ser mayor o igual a 0")
+        return value
 
 class PredictSingleResponseData(BaseModel):
     """
@@ -128,6 +128,13 @@ class PredictMultipleRequest(BaseModel):
     molecule_id: str
     bond_indices: List[int] = Field(..., min_items=1)
     smiles: Optional[str] = None
+
+    @field_validator('bond_indices', mode='before')
+    @classmethod
+    def validate_bond_indices(cls, value):
+        if not all(idx >= 0 for idx in value):
+            raise ValueError("Todos los índices de enlace deben ser mayores o iguales a 0")
+        return value
 
 class PredictMultipleResponseData(BaseModel):
     """
@@ -225,11 +232,9 @@ class DownloadReportRequest(BaseModel):
     """
     Entrada para /download_report/.
     - smiles: SMILES de la molécula
-    - bond_idx: Índice del enlace
     - format: 'pdf' o 'html'
     """
     smiles: str
-    bond_idx: int
     format: str
 
     @field_validator('format')
@@ -244,4 +249,4 @@ class DownloadReportResponseData(BaseModel):
     Salida de /download_report/.
     - report_base64: Reporte en base64
     """
-    report_base64: str  # Base64 del reporte archivo
+    report_base64: str

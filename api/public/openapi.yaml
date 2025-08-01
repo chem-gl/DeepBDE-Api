@@ -2,8 +2,8 @@ openapi: 3.0.3
 info:
   title: DeepBDE API
   version: 1.0.0
-  description: |
-    Esta API es completamente bilingüe: Español e Inglés.
+  description: |+
+    API from https://github.com/MSRG/DeepBDE/.
 
     ## Flujo de uso de la API (Español)
     1. Envía un SMILES a `/api/v1/predict/` para obtener la imagen 2D y los enlaces con sus índices.
@@ -23,14 +23,6 @@ info:
     6. Predict all single bond BDEs with `/api/v1/infer/all/`.
     7. Download a PDF report with `/api/v1/download_report/`.
 
-    ### Ejemplos de DTO / DTO Examples
-    - **PredictRequest**: {"smiles": "CCO"}
-    - **PredictSingleRequest**: {"smiles": "CCO", "bond_idx": 1}
-    - **PredictMultipleRequest**: {"mol_id": "a1b2c3d4e5f6a7b8", "bond_indices": [1, 2]}
-    - **FragmentRequest**: {"smiles": "CCO", "molecule_id": "a1b2c3d4e5f6a7b8", "export_smiles": true}
-    - **PredictCheckRequest**: {"smiles": "CCO", "bond_idx": 1, "products": ["CC", "O"]}
-    - **InferAllRequest**: {"smiles": "CCO"}
-    - **DownloadReportRequest**: {"smiles": "CCO", "bond_idx": 1, "format": "pdf"}
 paths:
   /api/schema/:
     get:
@@ -196,13 +188,11 @@ paths:
               EntradaDeEjemplo/ExampleInput:
                 value:
                   smiles: CCO
-                  bond_idx: 1
                   format: pdf
                 summary: Entrada de ejemplo / Example input
               EntradaAlternativa/AlternativeInput:
                 value:
                   smiles: C1=CC=CC=C1
-                  bond_idx: 2
                   format: pdf
                 summary: Entrada alternativa / Alternative input
           application/x-www-form-urlencoded:
@@ -222,12 +212,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[DownloadReportResponseData]'
+              examples:
+                EjemploExitoso:
+                  value:
+                    status: success
+                    data:
+                      report_base64: JVBERi0xLjQKJcfs...
+                    error: null
+                  summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
         '400':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[NoneType]'
+              examples:
+                ErrorPorFormatoInválido:
+                  value:
+                    status: error
+                    detail: Formato no soportado
+                  summary: Error por formato inválido
           description: Error de validación / Validation error
   /api/v1/fragment/:
     post:
@@ -272,12 +276,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[FragmentResponseData]'
+              examples:
+                EjemploExitoso:
+                  value:
+                    status: success
+                    data:
+                      smiles_canonical: CCO
+                      molecule_id: a1b2c3d4e5f6a7b8
+                      bonds:
+                      - idx: 1
+                        begin_atom: 0
+                        end_atom: 1
+                        bond_atoms: C-O
+                        is_fragmentable: true
+                      smiles_list:
+                      - CC
+                      - O
+                      xyz_block: null
+                    error: null
+                  summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
         '400':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[NoneType]'
+              examples:
+                ErrorPorFormatoInválido:
+                  value:
+                    status: error
+                    detail: Formato no soportado
+                  summary: Error por formato inválido
           description: Error de validación / Validation error
   /api/v1/infer/all/:
     post:
@@ -318,12 +347,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[InferAllResponseData]'
+              examples:
+                EjemploExitoso:
+                  value:
+                    status: success
+                    data:
+                      smiles_canonical: CCO
+                      molecule_id: a1b2c3d4e5f6a7b8
+                      bonds:
+                      - idx: 1
+                        bde: 95.0
+                        begin_atom_idx: 0
+                        end_atom_idx: 1
+                        bond_atoms: C-O
+                      - idx: 2
+                        bde: 100.0
+                        begin_atom_idx: 1
+                        end_atom_idx: 2
+                        bond_atoms: C-C
+                    error: null
+                  summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
         '400':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[NoneType]'
+              examples:
+                ErrorPorSMILESInválido:
+                  value:
+                    status: error
+                    detail: Formato SMILES inválido
+                  summary: Error por SMILES inválido
           description: Error de validación / Validation error
   /api/v1/predict/:
     post:
@@ -366,12 +421,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[PredictResponseData]'
+              examples:
+                EjemploExitoso:
+                  value:
+                    status: success
+                    data:
+                      smiles_canonical: CCO
+                      image_svg: <svg>...</svg>
+                      canvas:
+                        width: 300
+                        height: 300
+                      atoms:
+                        C1:
+                          x: 50.0
+                          y: 100.0
+                        C2:
+                          x: 150.0
+                          y: 100.0
+                        O:
+                          x: 250.0
+                          y: 100.0
+                      bonds:
+                        '0':
+                          from:
+                            atom: 1.0
+                          to:
+                            atom: 2.0
+                          type:
+                            bond_order: 1.0
+                        '1':
+                          from:
+                            atom: 2.0
+                          to:
+                            atom: 3.0
+                          type:
+                            bond_order: 1.0
+                      molecule_id: a1b2c3d4e5f6a7b8
+                    error: null
+                  summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
         '400':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[NoneType]'
+              examples:
+                ErrorPorSMILESInválido:
+                  value:
+                    status: error
+                    detail: Formato SMILES inválido
+                  summary: Error por SMILES inválido
           description: Error de validación / Validation error
   /api/v1/predict/check/:
     post:
@@ -420,12 +519,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[PredictCheckResponseData]'
+              examples:
+                EjemploExitoso:
+                  value:
+                    status: success
+                    data:
+                      smiles_canonical: CCO
+                      bond:
+                        idx: 1
+                        bde: 95.0
+                        begin_atom_idx: 0
+                        end_atom_idx: 1
+                        bond_atoms: C-O
+                      products:
+                      - CC
+                      - O
+                    error: null
+                  summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
         '400':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[NoneType]'
+              examples:
+                ErrorPorProductosInválidos:
+                  value:
+                    status: error
+                    detail: Productos no coinciden con los esperados
+                  summary: Error por productos inválidos
           description: Error de validación / Validation error
   /api/v1/predict/multiple/:
     post:
@@ -473,12 +595,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[PredictMultipleResponseData]'
+              examples:
+                EjemploExitoso:
+                  value:
+                    status: success
+                    data:
+                      smiles: CCO
+                      molecule_id: a1b2c3d4e5f6a7b8
+                      bonds:
+                      - idx: 1
+                        bde: 95.0
+                        begin_atom_idx: 0
+                        end_atom_idx: 1
+                        bond_atoms: C-O
+                      - idx: 2
+                        bde: 100.0
+                        begin_atom_idx: 1
+                        end_atom_idx: 2
+                        bond_atoms: C-C
+                    error: null
+                  summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
         '400':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[NoneType]'
+              examples:
+                ErrorPorÍndicesDeEnlaceInválidos:
+                  value:
+                    status: error
+                    detail: Índices de enlace fuera de rango
+                  summary: Error por índices de enlace inválidos
           description: Error de validación / Validation error
   /api/v1/predict/single/:
     post:
@@ -521,12 +669,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[PredictSingleResponseData]'
+              examples:
+                EjemploExitoso:
+                  value:
+                    status: success
+                    data:
+                      smiles_canonical: CCO
+                      bond:
+                        idx: 1
+                        bde: 95.0
+                        begin_atom_idx: 0
+                        end_atom_idx: 1
+                        bond_atoms: C-O
+                    error: null
+                  summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
         '400':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse[NoneType]'
+              examples:
+                ErrorPorÍndiceDeEnlaceInválido:
+                  value:
+                    status: error
+                    detail: Índice de enlace fuera de rango
+                  summary: Error por índice de enlace inválido
           description: Error de validación / Validation error
 components:
   schemas:
@@ -685,21 +853,16 @@ components:
       description: |-
         Entrada para /download_report/.
         - smiles: SMILES de la molécula
-        - bond_idx: Índice del enlace
         - format: 'pdf' o 'html'
       properties:
         smiles:
           title: Smiles
           type: string
-        bond_idx:
-          title: Bond Idx
-          type: integer
         format:
           title: Format
           type: string
       required:
       - smiles
-      - bond_idx
       - format
       title: DownloadReportRequest
       type: object
