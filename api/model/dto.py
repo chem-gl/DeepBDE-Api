@@ -50,6 +50,34 @@ class EvaluatedFragmentBond(BaseModel):
     bond_atoms: str  # Representación legible del enlace (ejemplo: 'C-H').
     is_fragmentable: bool  # Indica si el enlace puede fragmentarse (enlace simple, etc.).
 
+class Atom2D(BaseModel):
+    """
+    Información 2D de un átomo para visualización y metadatos.
+    - x: Coordenada X
+    - y: Coordenada Y
+    - symbol: Símbolo químico del átomo (ej. 'C', 'O')
+    - smiles: SMILES del átomo (opcional, para átomos complejos)
+    """
+    x: float
+    y: float
+    symbol: str
+    smiles: Optional[str] = None
+
+class Bond2D(BaseModel):
+    """
+    Información 2D de un enlace para visualización y metadatos.
+    - start: Índice del átomo inicial
+    - end: Índice del átomo final
+    - start_coords: Coordenadas del átomo inicial
+    - end_coords: Coordenadas del átomo final
+    - bond_atoms: Representación legible del enlace (ej. 'C-O')
+    """
+    start: int
+    end: int
+    start_coords: Dict[str, float]
+    end_coords: Dict[str, float]
+    bond_atoms: str
+
 # ---------- Plantilla de respuesta API ----------
 T = TypeVar('T')
 
@@ -80,15 +108,15 @@ class PredictResponseData(BaseModel):
     - smiles_canonical: SMILES canónico con hidrógenos explícitos
     - image_svg: Imagen SVG enriquecida
     - canvas: Metadatos del lienzo
-    - atoms: Posiciones de átomos
-    - bonds: Posiciones de enlaces
+    - atoms: Diccionario de información 2D de átomos
+    - bonds: Diccionario de información 2D de enlaces
     - molecule_id: ID único (hash SHA256)
     """
     smiles_canonical: str
     image_svg: str
     canvas: Dict[str, int]
-    atoms: Dict[str, Dict[str, float]]
-    bonds: Dict[str, Dict[str, Dict[str, float]]]
+    atoms: Dict[str, Atom2D]
+    bonds: Dict[str, Bond2D]
     molecule_id: str
 
 # --- /predict/single/ ---
@@ -96,11 +124,12 @@ class PredictSingleRequest(BaseModel):
     """
     Entrada para /predict/single/.
     - smiles: SMILES de la molécula
+    - molecule_id: ID único de la molécula
     - bond_idx: Índice del enlace (>= 0)
     """
     smiles: str
+    molecule_id: str
     bond_idx: int
-
     @field_validator('bond_idx')
     @classmethod
     def validate_bond_idx(cls, value):
@@ -125,9 +154,9 @@ class PredictMultipleRequest(BaseModel):
     - bond_indices: Lista de índices de enlaces
     - smiles: (opcional)
     """
+    smiles: str
+    bond_indices: list[int]
     molecule_id: str
-    bond_indices: List[int] = Field(..., min_items=1)
-    smiles: Optional[str] = None
 
     @field_validator('bond_indices', mode='before')
     @classmethod

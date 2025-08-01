@@ -432,30 +432,42 @@ paths:
                         width: 300
                         height: 300
                       atoms:
-                        C1:
+                        '0':
                           x: 50.0
                           y: 100.0
-                        C2:
+                          symbol: C
+                          smiles: '[CH3]'
+                        '1':
                           x: 150.0
                           y: 100.0
-                        O:
+                          symbol: C
+                          smiles: '[CH2]'
+                        '2':
                           x: 250.0
                           y: 100.0
+                          symbol: O
+                          smiles: O
                       bonds:
                         '0':
-                          from:
-                            atom: 1.0
-                          to:
-                            atom: 2.0
-                          type:
-                            bond_order: 1.0
+                          start: 0
+                          end: 1
+                          start_coords:
+                            x: 50.0
+                            y: 100.0
+                          end_coords:
+                            x: 150.0
+                            y: 100.0
+                          bond_atoms: C-C
                         '1':
-                          from:
-                            atom: 2.0
-                          to:
-                            atom: 3.0
-                          type:
-                            bond_order: 1.0
+                          start: 1
+                          end: 2
+                          start_coords:
+                            x: 150.0
+                            y: 100.0
+                          end_coords:
+                            x: 250.0
+                            y: 100.0
+                          bond_atoms: C-O
                       molecule_id: a1b2c3d4e5f6a7b8
                     error: null
                   summary: Ejemplo exitoso
@@ -565,18 +577,20 @@ paths:
             examples:
               EntradaDeEjemplo/ExampleInput:
                 value:
-                  mol_id: a1b2c3d4e5f6a7b8
+                  smiles: CCO
                   bond_indices:
                   - 1
                   - 2
+                  molecule_id: 150018eccd174140
                 summary: Entrada de ejemplo / Example input
               EntradaAlternativa/AlternativeInput:
                 value:
-                  mol_id: h1g2f3e4d5c6b7a8
+                  smiles: C1=CC=CC=C1
                   bond_indices:
                   - 0
                   - 2
                   - 3
+                  molecule_id: h1g2f3e4d5c6b7a8
                 summary: Entrada alternativa / Alternative input
           application/x-www-form-urlencoded:
             schema:
@@ -625,7 +639,9 @@ paths:
                 ErrorPorÍndicesDeEnlaceInválidos:
                   value:
                     status: error
-                    detail: Índices de enlace fuera de rango
+                    error:
+                      code: BOND_INDEX_OUT_OF_RANGE
+                      message: Índices de enlace fuera de rango
                   summary: Error por índices de enlace inválidos
           description: Error de validación / Validation error
   /api/v1/predict/single/:
@@ -646,11 +662,13 @@ paths:
                 value:
                   smiles: CCO
                   bond_idx: 1
+                  molecule_id: 150018eccd174140
                 summary: Ejemplo de entrada / Example input
               EjemploAlternativo/AlternativeExample:
                 value:
                   smiles: C1=CC=CC=C1
                   bond_idx: 2
+                  molecule_id: 4b7620ed22c55dfd
                 summary: Ejemplo alternativo / Alternative example
           application/x-www-form-urlencoded:
             schema:
@@ -848,6 +866,71 @@ components:
           - type: 'null'
           default: null
       title: APIResponse[PredictSingleResponseData]
+      type: object
+    Atom2D:
+      description: |-
+        Información 2D de un átomo para visualización y metadatos.
+        - x: Coordenada X
+        - y: Coordenada Y
+        - symbol: Símbolo químico del átomo (ej. 'C', 'O')
+        - smiles: SMILES del átomo (opcional, para átomos complejos)
+      properties:
+        x:
+          title: X
+          type: number
+        y:
+          title: Y
+          type: number
+        symbol:
+          title: Symbol
+          type: string
+        smiles:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Smiles
+      required:
+      - x
+      - y
+      - symbol
+      title: Atom2D
+      type: object
+    Bond2D:
+      description: |-
+        Información 2D de un enlace para visualización y metadatos.
+        - start: Índice del átomo inicial
+        - end: Índice del átomo final
+        - start_coords: Coordenadas del átomo inicial
+        - end_coords: Coordenadas del átomo final
+        - bond_atoms: Representación legible del enlace (ej. 'C-O')
+      properties:
+        start:
+          title: Start
+          type: integer
+        end:
+          title: End
+          type: integer
+        start_coords:
+          additionalProperties:
+            type: number
+          title: Start Coords
+          type: object
+        end_coords:
+          additionalProperties:
+            type: number
+          title: End Coords
+          type: object
+        bond_atoms:
+          title: Bond Atoms
+          type: string
+      required:
+      - start
+      - end
+      - start_coords
+      - end_coords
+      - bond_atoms
+      title: Bond2D
       type: object
     DownloadReportRequest:
       description: |-
@@ -1100,24 +1183,21 @@ components:
         - bond_indices: Lista de índices de enlaces
         - smiles: (opcional)
       properties:
-        molecule_id:
-          title: Molecule Id
+        smiles:
+          title: Smiles
           type: string
         bond_indices:
           items:
             type: integer
-          minItems: 1
           title: Bond Indices
           type: array
-        smiles:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Smiles
+        molecule_id:
+          title: Molecule Id
+          type: string
       required:
-      - molecule_id
+      - smiles
       - bond_indices
+      - molecule_id
       title: PredictMultipleRequest
       type: object
     PredictMultipleResponseData:
@@ -1162,8 +1242,8 @@ components:
         - smiles_canonical: SMILES canónico con hidrógenos explícitos
         - image_svg: Imagen SVG enriquecida
         - canvas: Metadatos del lienzo
-        - atoms: Posiciones de átomos
-        - bonds: Posiciones de enlaces
+        - atoms: Diccionario de información 2D de átomos
+        - bonds: Diccionario de información 2D de enlaces
         - molecule_id: ID único (hash SHA256)
       properties:
         smiles_canonical:
@@ -1179,18 +1259,12 @@ components:
           type: object
         atoms:
           additionalProperties:
-            additionalProperties:
-              type: number
-            type: object
+            $ref: '#/components/schemas/Atom2D'
           title: Atoms
           type: object
         bonds:
           additionalProperties:
-            additionalProperties:
-              additionalProperties:
-                type: number
-              type: object
-            type: object
+            $ref: '#/components/schemas/Bond2D'
           title: Bonds
           type: object
         molecule_id:
@@ -1209,16 +1283,21 @@ components:
       description: |-
         Entrada para /predict/single/.
         - smiles: SMILES de la molécula
+        - molecule_id: ID único de la molécula
         - bond_idx: Índice del enlace (>= 0)
       properties:
         smiles:
           title: Smiles
+          type: string
+        molecule_id:
+          title: Molecule Id
           type: string
         bond_idx:
           title: Bond Idx
           type: integer
       required:
       - smiles
+      - molecule_id
       - bond_idx
       title: PredictSingleRequest
       type: object

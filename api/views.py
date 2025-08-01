@@ -1,3 +1,4 @@
+import logging
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from rest_framework.views import APIView
@@ -51,10 +52,26 @@ class PredictView(APIView):
             smiles_canonical="CCO",
             image_svg="<svg>...</svg>",
             canvas={"width": 300, "height": 300},
-            atoms={"C1": {"x": 50.0, "y": 100.0}, "C2": {"x": 150.0, "y": 100.0}, "O": {"x": 250.0, "y": 100.0}},
+            atoms={
+                "0": {"x": 50.0, "y": 100.0, "symbol": "C", "smiles": "[CH3]"},
+                "1": {"x": 150.0, "y": 100.0, "symbol": "C", "smiles": "[CH2]"},
+                "2": {"x": 250.0, "y": 100.0, "symbol": "O", "smiles": "O"}
+            },
             bonds={
-                "0": {"from": {"atom": 1.0}, "to": {"atom": 2.0}, "type": {"bond_order": 1.0}},
-                "1": {"from": {"atom": 2.0}, "to": {"atom": 3.0}, "type": {"bond_order": 1.0}}
+                "0": {
+                    "start": 0,
+                    "end": 1,
+                    "start_coords": {"x": 50.0, "y": 100.0},
+                    "end_coords": {"x": 150.0, "y": 100.0},
+                    "bond_atoms": "C-C"
+                },
+                "1": {
+                    "start": 1,
+                    "end": 2,
+                    "start_coords": {"x": 150.0, "y": 100.0},
+                    "end_coords": {"x": 250.0, "y": 100.0},
+                    "bond_atoms": "C-O"
+                }
             },
             molecule_id="a1b2c3d4e5f6a7b8"
         )
@@ -173,12 +190,12 @@ class PredictSingleView(APIView):
         examples=[
             OpenApiExample(
                 "Ejemplo de entrada / Example input",
-                value={"smiles": "CCO", "bond_idx": 1},
+                value={"smiles": "CCO", "bond_idx": 1, "molecule_id": "150018eccd174140"},
                 request_only=True
             ),
             OpenApiExample(
                 "Ejemplo alternativo / Alternative example",
-                value={"smiles": "C1=CC=CC=C1", "bond_idx": 2},
+                value={"smiles": "C1=CC=CC=C1", "bond_idx": 2, "molecule_id": "4b7620ed22c55dfd"},
                 request_only=True
             )
         ]
@@ -247,7 +264,10 @@ class PredictMultipleView(APIView):
                         name="Error por índices de enlace inválidos",
                         value={
                             "status": "error",
-                            "detail": "Índices de enlace fuera de rango"
+                            "error": {
+                                "code": "BOND_INDEX_OUT_OF_RANGE",
+                                "message": "Índices de enlace fuera de rango"
+                            }
                         },
                         response_only=True
                     )
@@ -257,20 +277,23 @@ class PredictMultipleView(APIView):
         examples=[
             OpenApiExample(
                 "Entrada de ejemplo / Example input",
-                value={"mol_id": "a1b2c3d4e5f6a7b8", "bond_indices": [1, 2]},
+                value={ "smiles": "CCO", "bond_indices": [1, 2], "molecule_id": "150018eccd174140" },
                 request_only=True
             ),
             OpenApiExample(
                 "Entrada alternativa / Alternative input",
-                value={"mol_id": "h1g2f3e4d5c6b7a8", "bond_indices": [0, 2, 3]},
+                value={"smiles": "C1=CC=CC=C1", "bond_indices": [0, 2, 3], "molecule_id": "h1g2f3e4d5c6b7a8"},
                 request_only=True
             )
         ]
     )
     def post(self, request):
         try:
+            logging.info(f"Received request for multiple predictions: {request.data}")
             req = PredictMultipleRequest(**request.data)
+
             resp_data = predict_multiple_controller(req)
+ 
             resp = APIResponse[PredictMultipleResponseData](status="success", data=resp_data)
             return Response(resp.model_dump())
         except ValidationError as e:
