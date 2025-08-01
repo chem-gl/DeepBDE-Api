@@ -2,42 +2,35 @@ openapi: 3.0.3
 info:
   title: DeepBDE API
   version: 1.0.0
-  description: |-
+  description: |
     Esta API es completamente bilingüe: Español e Inglés.
 
     ## Flujo de uso de la API (Español)
-    1. El usuario envía un SMILES a `/api/v1/predict/` para obtener la imagen 2D y los enlaces con sus índices.
-    2. Para predecir la BDE de un enlace específico, usa `/api/v1/predict/single/` con el SMILES y el índice del enlace.
-    3. Para varios enlaces, usa `/api/v1/predict/multiple/` con el SMILES y una lista de índices.
-    4. Para obtener los fragmentos SMILES de la molécula, usa `/api/v1/fragment/smiles/` (puedes activar `all_bonds` para todos los fragmentos).
-    5. Para obtener los fragmentos en formato XYZ, usa `/api/v1/fragment/xyz/` (con `all_bonds` si se requiere).
-    6. Para validar productos de escisión y obtener la BDE, usa `/api/v1/predict/check/`.
-    7. Para predecir todas las BDE de enlaces simples, usa `/api/v1/infer/all/`.
-    8. Para descargar un reporte PDF, usa `/api/v1/download_report/`.
-    9. Para información del modelo, usa `/api/v1/info/`.
-    10. Para estado del sistema, usa `/api/v1/status/`.
-    11. Para métricas Prometheus, usa `/api/v1/metrics/`.
+    1. Envía un SMILES a `/api/v1/predict/` para obtener la imagen 2D y los enlaces con sus índices.
+    2. Usa `/api/v1/predict/single/` para predecir la BDE de un enlace específico.
+    3. Usa `/api/v1/predict/multiple/` para predecir las BDE de varios enlaces.
+    4. Genera fragmentos moleculares con `/api/v1/fragment/`.
+    5. Valida productos de escisión con `/api/v1/predict/check/`.
+    6. Predice todas las BDE de enlaces simples con `/api/v1/infer/all/`.
+    7. Descarga un informe PDF con `/api/v1/download_report/`.
 
     ## API usage flow (English)
-    This API is fully bilingual: Spanish and English.
+    1. Send a SMILES to `/api/v1/predict/` to get the 2D image and bond indices.
+    2. Use `/api/v1/predict/single/` to predict the BDE of a specific bond.
+    3. Use `/api/v1/predict/multiple/` to predict the BDEs of multiple bonds.
+    4. Generate molecular fragments with `/api/v1/fragment/`.
+    5. Validate cleavage products with `/api/v1/predict/check/`.
+    6. Predict all single bond BDEs with `/api/v1/infer/all/`.
+    7. Download a PDF report with `/api/v1/download_report/`.
 
-    1. The user sends a SMILES to `/api/v1/predict/` to get the 2D image and bonds with their indices.
-    2. To predict the BDE of a specific bond, use `/api/v1/predict/single/` with the SMILES and bond index.
-    3. For multiple bonds, use `/api/v1/predict/multiple/` with the SMILES and a list of indices.
-    4. To get SMILES fragments, use `/api/v1/fragment/smiles/` (enable `all_bonds` for all fragments).
-    5. To get fragments in XYZ format, use `/api/v1/fragment/xyz/` (with `all_bonds` if needed).
-    6. To validate cleavage products and get the BDE, use `/api/v1/predict/check/`.
-    7. To predict all single bond BDEs, use `/api/v1/infer/all/`.
-    8. To download a PDF report, use `/api/v1/download_report/`.
-    9. For model info, use `/api/v1/info/`.
-    10. For system status, use `/api/v1/status/`.
-    11. For Prometheus metrics, use `/api/v1/metrics/`.
-
-    ### Notas:
-    - El frontend debe mostrar la imagen y enlaces tras `/predict/`, y permitir seleccionar enlaces para `/single/` o `/multiple/`.
-    - Los checkboxes para fragmentos SMILES/XYZ deben activar el parámetro `all_bonds`.
-    - El reporte PDF se descarga tras la predicción.
-    - Todos los endpoints devuelven respuestas con el formato unificado: status, data, error.
+    ### Ejemplos de DTO / DTO Examples
+    - **PredictRequest**: {"smiles": "CCO"}
+    - **PredictSingleRequest**: {"smiles": "CCO", "bond_idx": 1}
+    - **PredictMultipleRequest**: {"mol_id": "a1b2c3d4e5f6a7b8", "bond_indices": [1, 2]}
+    - **FragmentRequest**: {"smiles": "CCO", "molecule_id": "a1b2c3d4e5f6a7b8", "export_smiles": true}
+    - **PredictCheckRequest**: {"smiles": "CCO", "bond_idx": 1, "products": ["CC", "O"]}
+    - **InferAllRequest**: {"smiles": "CCO"}
+    - **DownloadReportRequest**: {"smiles": "CCO", "bond_idx": 1, "format": "pdf"}
 paths:
   /api/schema/:
     get:
@@ -188,59 +181,36 @@ paths:
   /api/v1/download_report/:
     post:
       operationId: v1_download_report_create
-      description: |-
-        Genera y descarga un informe PDF con los resultados de la predicción para la molécula y enlace indicados.
-
-        Generates and downloads a PDF report with the prediction results for the specified molecule and bond.
+      description: "\n        Genera y descarga un informe PDF con los resultados\
+        \ de la predicción para la molécula y enlace indicados.\n        \n      \
+        \  Generates and downloads a PDF report with the prediction results for the\
+        \ indicated molecule and bond.\n        "
       tags:
       - v1
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DownloadReport'
+              $ref: '#/components/schemas/DownloadReportRequest'
             examples:
-              Etanol:
+              EntradaDeEjemplo/ExampleInput:
                 value:
                   smiles: CCO
                   bond_idx: 1
                   format: pdf
-              Benceno:
+                summary: Entrada de ejemplo / Example input
+              EntradaAlternativa/AlternativeInput:
                 value:
-                  smiles: c1ccccc1
+                  smiles: C1=CC=CC=C1
                   bond_idx: 2
                   format: pdf
-              Metano:
-                value:
-                  smiles: C
-                  bond_idx: 0
-                  format: pdf
-              Cafeína:
-                value:
-                  smiles: Cn1cnc2c1c(=O)n(C)c(=O)n2C
-                  bond_idx: 5
-                  format: pdf
-              Taxol:
-                value:
-                  smiles: CC1=C2C(=CC(=O)OC2=CC3=C1C(=O)OC3)OC
-                  bond_idx: 10
-                  format: pdf
-              Colesterol:
-                value:
-                  smiles: CC(C)CCCC(C)C1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C
-                  bond_idx: 15
-                  format: pdf
-              Morfina:
-                value:
-                  smiles: CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5
-                  bond_idx: 8
-                  format: pdf
+                summary: Entrada alternativa / Alternative input
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/DownloadReport'
+              $ref: '#/components/schemas/DownloadReportRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/DownloadReport'
+              $ref: '#/components/schemas/DownloadReportRequest'
         required: true
       security:
       - cookieAuth: []
@@ -251,64 +221,46 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DownloadReport'
-          description: ''
-  /api/v1/fragment/smiles/:
+                $ref: '#/components/schemas/APIResponse[DownloadReportResponseData]'
+          description: Respuesta exitosa / Successful response
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse[NoneType]'
+          description: Error de validación / Validation error
+  /api/v1/fragment/:
     post:
-      operationId: v1_fragment_smiles_create
-      description: |-
-        Genera fragmentos moleculares en formato SMILES a partir de la molécula dada. Puede devolver todos los fragmentos por escisión de enlaces simples.
-
-        Generates molecular fragments in SMILES format from the given molecule. Can return all fragments by single bond cleavage.
+      operationId: v1_fragment_create
+      description: "\n        Genera fragmentos moleculares en formato SMILES o XYZ.\n\
+        \        \n        Generates molecular fragments in SMILES or XYZ format.\n\
+        \        "
       tags:
       - v1
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/FragmentSmiles'
+              $ref: '#/components/schemas/FragmentRequest'
             examples:
-              Etanol,TodosLosEnlaces:
+              EntradaDeEjemplo/ExampleInput:
                 value:
                   smiles: CCO
-                  all_bonds: true
-                summary: Etanol, todos los enlaces
-              Benceno,SoloUno:
+                  molecule_id: a1b2c3d4e5f6a7b8
+                  export_smiles: true
+                summary: Entrada de ejemplo / Example input
+              EntradaAlternativa/AlternativeInput:
                 value:
-                  smiles: c1ccccc1
-                  all_bonds: false
-                summary: Benceno, solo uno
-              Metano,Todos:
-                value:
-                  smiles: C
-                  all_bonds: true
-                summary: Metano, todos
-              Cafeína,Todos:
-                value:
-                  smiles: Cn1cnc2c1c(=O)n(C)c(=O)n2C
-                  all_bonds: true
-                summary: Cafeína, todos
-              Taxol,Todos:
-                value:
-                  smiles: CC1=C2C(=CC(=O)OC2=CC3=C1C(=O)OC3)OC
-                  all_bonds: true
-                summary: Taxol, todos
-              Colesterol,Todos:
-                value:
-                  smiles: CC(C)CCCC(C)C1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C
-                  all_bonds: true
-                summary: Colesterol, todos
-              Morfina,Todos:
-                value:
-                  smiles: CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5
-                  all_bonds: true
-                summary: Morfina, todos
+                  smiles: C1=CC=CC=C1
+                  molecule_id: h1g2f3e4d5c6b7a8
+                  export_xyz: true
+                summary: Entrada alternativa / Alternative input
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/FragmentSmiles'
+              $ref: '#/components/schemas/FragmentRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/FragmentSmiles'
+              $ref: '#/components/schemas/FragmentRequest'
         required: true
       security:
       - cookieAuth: []
@@ -319,118 +271,42 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FragmentSmiles'
-          description: ''
-  /api/v1/fragment/xyz/:
-    post:
-      operationId: v1_fragment_xyz_create
-      description: |-
-        Genera fragmentos moleculares en formato XYZ a partir de la molécula dada. Puede devolver todos los fragmentos por escisión de enlaces simples.
-
-        Generates molecular fragments in XYZ format from the given molecule. Can return all fragments by single bond cleavage.
-      tags:
-      - v1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/FragmentXYZ'
-            examples:
-              Etanol,TodosLosEnlaces:
-                value:
-                  smiles: CCO
-                  all_bonds: true
-                summary: Etanol, todos los enlaces
-              Benceno,SoloUno:
-                value:
-                  smiles: c1ccccc1
-                  all_bonds: false
-                summary: Benceno, solo uno
-              Metano,Todos:
-                value:
-                  smiles: C
-                  all_bonds: true
-                summary: Metano, todos
-              Cafeína,Todos:
-                value:
-                  smiles: Cn1cnc2c1c(=O)n(C)c(=O)n2C
-                  all_bonds: true
-                summary: Cafeína, todos
-              Taxol,Todos:
-                value:
-                  smiles: CC1=C2C(=CC(=O)OC2=CC3=C1C(=O)OC3)OC
-                  all_bonds: true
-                summary: Taxol, todos
-              Colesterol,Todos:
-                value:
-                  smiles: CC(C)CCCC(C)C1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C
-                  all_bonds: true
-                summary: Colesterol, todos
-              Morfina,Todos:
-                value:
-                  smiles: CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5
-                  all_bonds: true
-                summary: Morfina, todos
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/FragmentXYZ'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/FragmentXYZ'
-        required: true
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
+                $ref: '#/components/schemas/APIResponse[FragmentResponseData]'
+          description: Respuesta exitosa / Successful response
+        '400':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FragmentXYZ'
-          description: ''
+                $ref: '#/components/schemas/APIResponse[NoneType]'
+          description: Error de validación / Validation error
   /api/v1/infer/all/:
     post:
       operationId: v1_infer_all_create
-      description: |-
-        Predice las energías de disociación para todos los enlaces simples de la molécula dada.
-
-        Predicts dissociation energies for all single bonds in the given molecule.
+      description: "\n        Predice las energías de disociación para todos los enlaces\
+        \ simples de la molécula dada.\n        \n        Predicts the dissociation\
+        \ energies for all single bonds of the given molecule.\n        "
       tags:
       - v1
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/InferAll'
+              $ref: '#/components/schemas/InferAllRequest'
             examples:
-              Etanol:
+              EntradaDeEjemplo/ExampleInput:
                 value:
                   smiles: CCO
-              Benceno:
+                summary: Entrada de ejemplo / Example input
+              EntradaAlternativa/AlternativeInput:
                 value:
-                  smiles: c1ccccc1
-              Metano:
-                value:
-                  smiles: C
-              Cafeína:
-                value:
-                  smiles: Cn1cnc2c1c(=O)n(C)c(=O)n2C
-              Taxol:
-                value:
-                  smiles: CC1=C2C(=CC(=O)OC2=CC3=C1C(=O)OC3)OC
-              Colesterol:
-                value:
-                  smiles: CC(C)CCCC(C)C1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C
-              Morfina:
-                value:
-                  smiles: CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5
+                  smiles: C1=CC=CC=C1
+                summary: Entrada alternativa / Alternative input
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/InferAll'
+              $ref: '#/components/schemas/InferAllRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/InferAll'
+              $ref: '#/components/schemas/InferAllRequest'
         required: true
       security:
       - cookieAuth: []
@@ -441,60 +317,44 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InferAll'
-          description: ''
-  /api/v1/info/:
-    get:
-      operationId: v1_info_retrieve
-      description: |-
-        Devuelve información sobre la versión del modelo y metadatos relevantes.
-
-        Returns information about the model version and relevant metadata.
-      tags:
-      - v1
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
-          description: No response body
-  /api/v1/metrics/:
-    get:
-      operationId: v1_metrics_retrieve
-      description: |-
-        Devuelve métricas Prometheus para monitoreo del sistema.
-
-        Returns Prometheus metrics for system monitoring.
-      tags:
-      - v1
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
-          description: No response body
+                $ref: '#/components/schemas/APIResponse[InferAllResponseData]'
+          description: Respuesta exitosa / Successful response
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse[NoneType]'
+          description: Error de validación / Validation error
   /api/v1/predict/:
     post:
       operationId: v1_predict_create
-      description: |-
-        Devuelve información enriquecida de la molécula: SMILES canónico, imagen SVG, metadatos de canvas, posiciones de átomos y enlaces, id único y SMILES de cada átomo.
-
-        Returns enriched molecule information: canonical SMILES, SVG image, canvas metadata, atom and bond positions, unique id, and atom SMILES.
+      description: "\n        Devuelve información enriquecida de la molécula: SMILES\
+        \ canónico, imagen SVG, metadatos de canvas, posiciones de átomos y enlaces,\
+        \ id único.\n        \n        Returns enriched information about the molecule:\
+        \ canonical SMILES, SVG image, canvas metadata, atom and bond positions, unique\
+        \ ID.\n        "
       tags:
       - v1
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Predict'
+              $ref: '#/components/schemas/PredictRequest'
+            examples:
+              EjemploDeEntrada/ExampleInput:
+                value:
+                  smiles: CCO
+                summary: Ejemplo de entrada / Example input
+              EjemploAlternativo/AlternativeExample:
+                value:
+                  smiles: C1=CC=CC=C1
+                summary: Ejemplo alternativo / Alternative example
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Predict'
+              $ref: '#/components/schemas/PredictRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Predict'
+              $ref: '#/components/schemas/PredictRequest'
         required: true
       security:
       - cookieAuth: []
@@ -502,58 +362,53 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse[PredictResponseData]'
+          description: Respuesta exitosa / Successful response
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse[NoneType]'
+          description: Error de validación / Validation error
   /api/v1/predict/check/:
     post:
       operationId: v1_predict_check_create
-      description: |-
-        Verifica si los productos generados por la escisión de un enlace corresponden a los esperados y predice la BDE.
-
-        Checks if the products generated by bond cleavage match the expected ones and predicts the BDE.
+      description: "\n        Verifica productos generados por la escisión de un enlace\
+        \ y predice la BDE.\n        \n        Verifies products generated by the\
+        \ cleavage of a bond and predicts the BDE.\n        "
       tags:
       - v1
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PredictCheck'
+              $ref: '#/components/schemas/PredictCheckRequest'
             examples:
-              Etanol,ProductosCorrectos:
+              EntradaDeEjemplo/ExampleInput:
                 value:
                   smiles: CCO
                   bond_idx: 1
                   products:
-                  - '[CH3]'
-                  - '[OH]'
-                summary: Etanol, productos correctos
-              Etanol,ProductosIncorrectos:
+                  - CC
+                  - O
+                summary: Entrada de ejemplo / Example input
+              EntradaAlternativa/AlternativeInput:
                 value:
-                  smiles: CCO
-                  bond_idx: 1
+                  smiles: C1=CC=CC=C1
+                  bond_idx: 2
                   products:
-                  - '[C]'
-                  - '[COH]'
-                summary: Etanol, productos incorrectos
-              Cafeína:
-                value:
-                  smiles: Cn1cnc2c1c(=O)n(C)c(=O)n2C
-                  bond_idx: 5
-                  products:
-                  - '[C]'
-                  - '[N]'
-              Taxol:
-                value:
-                  smiles: CC1=C2C(=CC(=O)OC2=CC3=C1C(=O)OC3)OC
-                  bond_idx: 10
-                  products:
-                  - '[C]'
-                  - '[O]'
+                  - C1=CC
+                  - C=C1
+                summary: Entrada alternativa / Alternative input
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PredictCheck'
+              $ref: '#/components/schemas/PredictCheckRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PredictCheck'
+              $ref: '#/components/schemas/PredictCheckRequest'
         required: true
       security:
       - cookieAuth: []
@@ -564,77 +419,49 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PredictCheck'
-          description: ''
+                $ref: '#/components/schemas/APIResponse[PredictCheckResponseData]'
+          description: Respuesta exitosa / Successful response
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse[NoneType]'
+          description: Error de validación / Validation error
   /api/v1/predict/multiple/:
     post:
       operationId: v1_predict_multiple_create
-      description: |-
-        Predice las energías de disociación para varios enlaces de la molécula (SMILES y bond_indices).
-
-        Predicts dissociation energies for multiple bonds in the molecule (SMILES and bond_indices).
+      description: "\n        Predice las energías de disociación para varios enlaces\
+        \ de la molécula.\n        \n        Predicts the dissociation energies for\
+        \ multiple bonds of the molecule.\n        "
       tags:
       - v1
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PredictMultiple'
+              $ref: '#/components/schemas/PredictMultipleRequest'
             examples:
-              Etanol,Enlaces1Y2:
+              EntradaDeEjemplo/ExampleInput:
                 value:
-                  smiles: CCO
+                  mol_id: a1b2c3d4e5f6a7b8
                   bond_indices:
                   - 1
                   - 2
-                summary: Etanol, enlaces 1 y 2
-              Benceno,Enlaces0,1:
+                summary: Entrada de ejemplo / Example input
+              EntradaAlternativa/AlternativeInput:
                 value:
-                  smiles: c1ccccc1
+                  mol_id: h1g2f3e4d5c6b7a8
                   bond_indices:
                   - 0
-                  - 1
-                summary: Benceno, enlaces 0,1
-              Metano,Enlace0:
-                value:
-                  smiles: C
-                  bond_indices:
-                  - 0
-                summary: Metano, enlace 0
-              Cafeína,Enlaces2,5:
-                value:
-                  smiles: Cn1cnc2c1c(=O)n(C)c(=O)n2C
-                  bond_indices:
                   - 2
-                  - 5
-                summary: Cafeína, enlaces 2,5
-              Taxol,Enlaces3,10:
-                value:
-                  smiles: CC1=C2C(=CC(=O)OC2=CC3=C1C(=O)OC3)OC
-                  bond_indices:
                   - 3
-                  - 10
-                summary: Taxol, enlaces 3,10
-              Colesterol,Enlaces7,15:
-                value:
-                  smiles: CC(C)CCCC(C)C1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C
-                  bond_indices:
-                  - 7
-                  - 15
-                summary: Colesterol, enlaces 7,15
-              Morfina,Enlaces4,8:
-                value:
-                  smiles: CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5
-                  bond_indices:
-                  - 4
-                  - 8
-                summary: Morfina, enlaces 4,8
+                summary: Entrada alternativa / Alternative input
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PredictMultiple'
+              $ref: '#/components/schemas/PredictMultipleRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PredictMultiple'
+              $ref: '#/components/schemas/PredictMultipleRequest'
         required: true
       security:
       - cookieAuth: []
@@ -645,68 +472,44 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PredictMultiple'
-          description: ''
+                $ref: '#/components/schemas/APIResponse[PredictMultipleResponseData]'
+          description: Respuesta exitosa / Successful response
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse[NoneType]'
+          description: Error de validación / Validation error
   /api/v1/predict/single/:
     post:
       operationId: v1_predict_single_create
-      description: |-
-        Predice la energía de disociación para un enlace específico de la molécula (SMILES y bond_idx).
-
-        Predicts the dissociation energy for a specific bond in the molecule (SMILES and bond_idx).
+      description: "\n        Predice la energía de disociación para un enlace específico\
+        \ de la molécula.\n        \n        Predicts the dissociation energy for\
+        \ a specific bond of the molecule.\n        "
       tags:
       - v1
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PredictSingle'
+              $ref: '#/components/schemas/PredictSingleRequest'
             examples:
-              Etanol,Enlace1:
+              EjemploDeEntrada/ExampleInput:
                 value:
                   smiles: CCO
                   bond_idx: 1
-                summary: Etanol, enlace 1
-              Benceno,Enlace2:
+                summary: Ejemplo de entrada / Example input
+              EjemploAlternativo/AlternativeExample:
                 value:
-                  smiles: c1ccccc1
+                  smiles: C1=CC=CC=C1
                   bond_idx: 2
-                summary: Benceno, enlace 2
-              Metano,Enlace0:
-                value:
-                  smiles: C
-                  bond_idx: 0
-                summary: Metano, enlace 0
-              Cafeína,Enlace5:
-                value:
-                  smiles: Cn1cnc2c1c(=O)n(C)c(=O)n2C
-                  bond_idx: 5
-                summary: Cafeína, enlace 5
-              Taxol,Enlace10:
-                value:
-                  smiles: CC1=C2C(=CC(=O)OC2=CC3=C1C(=O)OC3)OC
-                  bond_idx: 10
-                summary: Taxol, enlace 10
-              Colesterol,Enlace15:
-                value:
-                  smiles: CC(C)CCCC(C)C1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C
-                  bond_idx: 15
-                summary: Colesterol, enlace 15
-              Morfina,Enlace8:
-                value:
-                  smiles: CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5
-                  bond_idx: 8
-                summary: Morfina, enlace 8
-              Punto:
-                value:
-                  smiles: .
-                  bond_idx: 1
+                summary: Ejemplo alternativo / Alternative example
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PredictSingle'
+              $ref: '#/components/schemas/PredictSingleRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PredictSingle'
+              $ref: '#/components/schemas/PredictSingleRequest'
         required: true
       security:
       - cookieAuth: []
@@ -717,118 +520,598 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PredictSingle'
-          description: ''
-  /api/v1/status/:
-    get:
-      operationId: v1_status_retrieve
-      description: |-
-        Devuelve el estado actual del sistema y recursos disponibles.
-
-        Returns the current system status and available resources.
-      tags:
-      - v1
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
-          description: No response body
+                $ref: '#/components/schemas/APIResponse[PredictSingleResponseData]'
+          description: Respuesta exitosa / Successful response
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse[NoneType]'
+          description: Error de validación / Validation error
 components:
   schemas:
-    DownloadReport:
+    APIResponse[DownloadReportResponseData]:
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          default: success
+          title: Status
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/DownloadReportResponseData'
+          - type: 'null'
+          default: null
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorDetail'
+          - type: 'null'
+          default: null
+      title: APIResponse[DownloadReportResponseData]
       type: object
-      description: Serializer para DownloadReportRequest
+    APIResponse[FragmentResponseData]:
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          default: success
+          title: Status
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/FragmentResponseData'
+          - type: 'null'
+          default: null
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorDetail'
+          - type: 'null'
+          default: null
+      title: APIResponse[FragmentResponseData]
+      type: object
+    APIResponse[InferAllResponseData]:
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          default: success
+          title: Status
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/InferAllResponseData'
+          - type: 'null'
+          default: null
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorDetail'
+          - type: 'null'
+          default: null
+      title: APIResponse[InferAllResponseData]
+      type: object
+    APIResponse[NoneType]:
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          default: success
+          title: Status
+        data:
+          default: null
+          title: Data
+          type: 'null'
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorDetail'
+          - type: 'null'
+          default: null
+      title: APIResponse[NoneType]
+      type: object
+    APIResponse[PredictCheckResponseData]:
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          default: success
+          title: Status
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/PredictCheckResponseData'
+          - type: 'null'
+          default: null
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorDetail'
+          - type: 'null'
+          default: null
+      title: APIResponse[PredictCheckResponseData]
+      type: object
+    APIResponse[PredictMultipleResponseData]:
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          default: success
+          title: Status
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/PredictMultipleResponseData'
+          - type: 'null'
+          default: null
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorDetail'
+          - type: 'null'
+          default: null
+      title: APIResponse[PredictMultipleResponseData]
+      type: object
+    APIResponse[PredictResponseData]:
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          default: success
+          title: Status
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/PredictResponseData'
+          - type: 'null'
+          default: null
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorDetail'
+          - type: 'null'
+          default: null
+      title: APIResponse[PredictResponseData]
+      type: object
+    APIResponse[PredictSingleResponseData]:
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          default: success
+          title: Status
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/PredictSingleResponseData'
+          - type: 'null'
+          default: null
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorDetail'
+          - type: 'null'
+          default: null
+      title: APIResponse[PredictSingleResponseData]
+      type: object
+    DownloadReportRequest:
+      description: |-
+        Entrada para /download_report/.
+        - smiles: SMILES de la molécula
+        - bond_idx: Índice del enlace
+        - format: 'pdf' o 'html'
       properties:
         smiles:
+          title: Smiles
           type: string
         bond_idx:
+          title: Bond Idx
           type: integer
         format:
+          title: Format
           type: string
       required:
+      - smiles
       - bond_idx
       - format
-      - smiles
-    FragmentSmiles:
+      title: DownloadReportRequest
       type: object
-      description: Serializer para FragmentSmilesRequest
+    DownloadReportResponseData:
+      description: |-
+        Salida de /download_report/.
+        - report_base64: Reporte en base64
       properties:
-        smiles:
+        report_base64:
+          title: Report Base64
           type: string
-        all_bonds:
+      required:
+      - report_base64
+      title: DownloadReportResponseData
+      type: object
+    ErrorCode:
+      description: Enumeración de códigos de error estándar de la API.
+      enum:
+      - SMILES_INVALID
+      - BOND_INDEX_OUT_OF_RANGE
+      - UNSUPPORTED_FORMAT
+      - MISSING_EXPORT_OPTION
+      title: ErrorCode
+      type: string
+    ErrorDetail:
+      description: |-
+        Detalle de error estándar para respuestas de la API.
+        - code: Código de error único (ErrorCode).
+        - message: Descripción amigable del error.
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          title: Message
+          type: string
+      required:
+      - code
+      - message
+      title: ErrorDetail
+      type: object
+    EvaluatedFragmentBond:
+      description: |-
+        Representa un enlace evaluado para fragmentación.
+        - idx: Índice del enlace en la molécula.
+        - begin_atom: Índice del átomo inicial del enlace.
+        - end_atom: Índice del átomo final del enlace.
+        - bond_atoms: Representación legible del enlace (ejemplo: 'C-H').
+        - is_fragmentable: Indica si el enlace puede fragmentarse (enlace simple, etc.).
+      properties:
+        idx:
+          title: Idx
+          type: integer
+        begin_atom:
+          title: Begin Atom
+          type: integer
+        end_atom:
+          title: End Atom
+          type: integer
+        bond_atoms:
+          title: Bond Atoms
+          type: string
+        is_fragmentable:
+          title: Is Fragmentable
           type: boolean
-          default: false
       required:
-      - smiles
-    FragmentXYZ:
+      - idx
+      - begin_atom
+      - end_atom
+      - bond_atoms
+      - is_fragmentable
+      title: EvaluatedFragmentBond
       type: object
-      description: Serializer para FragmentXYZRequest
+    FragmentRequest:
+      description: |-
+        Entrada para /fragment/.
+        - smiles: SMILES con hidrógenos explícitos
+        - molecule_id: ID de la molécula
+        - bond_idx: Índice del enlace (opcional)
+        - export_smiles: Si True, devuelve lista de SMILES
+        - export_xyz: Si True, devuelve bloque XYZ
       properties:
         smiles:
+          title: Smiles
           type: string
-        all_bonds:
-          type: boolean
-          default: false
-      required:
-      - smiles
-    InferAll:
-      type: object
-      description: Serializer para InferAllRequest
-      properties:
-        smiles:
-          type: string
-      required:
-      - smiles
-    Predict:
-      type: object
-      description: Serializer para PredictRequest
-      properties:
-        smiles:
-          type: string
-      required:
-      - smiles
-    PredictCheck:
-      type: object
-      description: Serializer para PredictCheckRequest
-      properties:
-        smiles:
+        molecule_id:
+          title: Molecule Id
           type: string
         bond_idx:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          default: null
+          title: Bond Idx
+        export_smiles:
+          default: false
+          title: Export Smiles
+          type: boolean
+        export_xyz:
+          default: false
+          title: Export Xyz
+          type: boolean
+      required:
+      - smiles
+      - molecule_id
+      title: FragmentRequest
+      type: object
+    FragmentResponseData:
+      description: |-
+        Salida de /fragment/.
+        - smiles_canonical: SMILES canónico
+        - molecule_id: ID de la molécula
+        - bonds: Lista de enlaces evaluados
+        - smiles_list: Lista de SMILES (opcional)
+        - xyz_block: Cadena XYZ (opcional)
+      properties:
+        smiles_canonical:
+          title: Smiles Canonical
+          type: string
+        molecule_id:
+          title: Molecule Id
+          type: string
+        bonds:
+          items:
+            $ref: '#/components/schemas/EvaluatedFragmentBond'
+          title: Bonds
+          type: array
+        smiles_list:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          default: null
+          title: Smiles List
+        xyz_block:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Xyz Block
+      required:
+      - smiles_canonical
+      - molecule_id
+      - bonds
+      title: FragmentResponseData
+      type: object
+    InferAllRequest:
+      description: |-
+        Entrada para /infer/all/.
+        - smiles: SMILES de la molécula
+      properties:
+        smiles:
+          title: Smiles
+          type: string
+      required:
+      - smiles
+      title: InferAllRequest
+      type: object
+    InferAllResponseData:
+      description: |-
+        Salida de /infer/all/.
+        - smiles_canonical: SMILES canónico
+        - molecule_id: ID de la molécula
+        - bonds: Lista de detalles de enlaces
+      properties:
+        smiles_canonical:
+          title: Smiles Canonical
+          type: string
+        molecule_id:
+          title: Molecule Id
+          type: string
+        bonds:
+          items:
+            $ref: '#/components/schemas/PredictedBond'
+          title: Bonds
+          type: array
+      required:
+      - smiles_canonical
+      - molecule_id
+      - bonds
+      title: InferAllResponseData
+      type: object
+    PredictCheckRequest:
+      description: |-
+        Entrada para /predict/check/.
+        - smiles: SMILES original
+        - bond_idx: Índice del enlace
+        - products: Lista de SMILES esperados
+      properties:
+        smiles:
+          title: Smiles
+          type: string
+        bond_idx:
+          title: Bond Idx
           type: integer
         products:
-          type: array
           items:
             type: string
+          minItems: 1
+          title: Products
+          type: array
       required:
+      - smiles
       - bond_idx
       - products
-      - smiles
-    PredictMultiple:
+      title: PredictCheckRequest
       type: object
-      description: Serializer para PredictMultipleRequest
+    PredictCheckResponseData:
+      description: |-
+        Salida de /predict/check/.
+        - smiles_canonical: SMILES canónico
+        - bond: Detalle del enlace analizado
+        - products: Lista de SMILES resultantes
       properties:
-        smiles:
+        smiles_canonical:
+          title: Smiles Canonical
+          type: string
+        bond:
+          $ref: '#/components/schemas/PredictedBond'
+        products:
+          items:
+            type: string
+          title: Products
+          type: array
+      required:
+      - smiles_canonical
+      - bond
+      - products
+      title: PredictCheckResponseData
+      type: object
+    PredictMultipleRequest:
+      description: |-
+        Entrada para /predict/multiple/.
+        - molecule_id: ID de la molécula
+        - bond_indices: Lista de índices de enlaces
+        - smiles: (opcional)
+      properties:
+        molecule_id:
+          title: Molecule Id
           type: string
         bond_indices:
-          type: array
           items:
             type: integer
+          minItems: 1
+          title: Bond Indices
+          type: array
+        smiles:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Smiles
       required:
+      - molecule_id
       - bond_indices
-      - smiles
-    PredictSingle:
+      title: PredictMultipleRequest
       type: object
-      description: Serializer para PredictSingleRequest
+    PredictMultipleResponseData:
+      description: |-
+        Salida de /predict/multiple/.
+        - smiles: SMILES canónico
+        - molecule_id: ID de la molécula
+        - bonds: Lista de detalles de enlaces
       properties:
         smiles:
+          title: Smiles
+          type: string
+        molecule_id:
+          title: Molecule Id
+          type: string
+        bonds:
+          items:
+            $ref: '#/components/schemas/PredictedBond'
+          title: Bonds
+          type: array
+      required:
+      - smiles
+      - molecule_id
+      - bonds
+      title: PredictMultipleResponseData
+      type: object
+    PredictRequest:
+      description: |-
+        Entrada para /predict/.
+        - smiles: SMILES de la molécula
+      properties:
+        smiles:
+          title: Smiles
+          type: string
+      required:
+      - smiles
+      title: PredictRequest
+      type: object
+    PredictResponseData:
+      description: |-
+        Salida de /predict/.
+        - smiles_canonical: SMILES canónico con hidrógenos explícitos
+        - image_svg: Imagen SVG enriquecida
+        - canvas: Metadatos del lienzo
+        - atoms: Posiciones de átomos
+        - bonds: Posiciones de enlaces
+        - molecule_id: ID único (hash SHA256)
+      properties:
+        smiles_canonical:
+          title: Smiles Canonical
+          type: string
+        image_svg:
+          title: Image Svg
+          type: string
+        canvas:
+          additionalProperties:
+            type: integer
+          title: Canvas
+          type: object
+        atoms:
+          additionalProperties:
+            additionalProperties:
+              type: number
+            type: object
+          title: Atoms
+          type: object
+        bonds:
+          additionalProperties:
+            additionalProperties:
+              additionalProperties:
+                type: number
+              type: object
+            type: object
+          title: Bonds
+          type: object
+        molecule_id:
+          title: Molecule Id
+          type: string
+      required:
+      - smiles_canonical
+      - image_svg
+      - canvas
+      - atoms
+      - bonds
+      - molecule_id
+      title: PredictResponseData
+      type: object
+    PredictSingleRequest:
+      description: |-
+        Entrada para /predict/single/.
+        - smiles: SMILES de la molécula
+        - bond_idx: Índice del enlace (>= 0)
+      properties:
+        smiles:
+          title: Smiles
           type: string
         bond_idx:
+          title: Bond Idx
           type: integer
       required:
-      - bond_idx
       - smiles
+      - bond_idx
+      title: PredictSingleRequest
+      type: object
+    PredictSingleResponseData:
+      description: |-
+        Salida de /predict/single/.
+        - smiles_canonical: SMILES canónico
+        - bond: Detalle del enlace predicho
+      properties:
+        smiles_canonical:
+          title: Smiles Canonical
+          type: string
+        bond:
+          $ref: '#/components/schemas/PredictedBond'
+      required:
+      - smiles_canonical
+      - bond
+      title: PredictSingleResponseData
+      type: object
+    PredictedBond:
+      description: |-
+        Detalle de un enlace químico y su BDE predicha.
+        - idx: Índice del enlace en la molécula.
+        - bde: Energía de disociación predicha para el enlace.
+        - begin_atom_idx: Índice del átomo inicial del enlace.
+        - end_atom_idx: Índice del átomo final del enlace.
+        - bond_atoms: Representación legible del enlace (ejemplo: 'C-O').
+      properties:
+        idx:
+          title: Idx
+          type: integer
+        bde:
+          title: Bde
+          type: number
+        begin_atom_idx:
+          title: Begin Atom Idx
+          type: integer
+        end_atom_idx:
+          title: End Atom Idx
+          type: integer
+        bond_atoms:
+          title: Bond Atoms
+          type: string
+      required:
+      - idx
+      - bde
+      - begin_atom_idx
+      - end_atom_idx
+      - bond_atoms
+      title: PredictedBond
+      type: object
+    StatusEnum:
+      enum:
+      - success
+      - error
+      type: string
   securitySchemes:
     basicAuth:
       type: http

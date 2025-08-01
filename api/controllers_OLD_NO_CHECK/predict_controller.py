@@ -1,8 +1,4 @@
-from api.model.dto import (
-    PredictRequest, PredictResponse,
-    PredictSingleRequest, PredictSingleResponse,
-    PredictMultipleRequest, PredictMultipleResponse, PredictMultipleBond
-) 
+ 
 import torch
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -19,12 +15,12 @@ def predict_bde_controller(request: PredictRequest) -> PredictResponse:
             - smiles (str): SMILES de la molécula.
     Devuelve:
         PredictResponse:
-            - smiles_canonical (str): SMILES canónico de la molécula ingresada.
-            - image_svg (str): Imagen SVG enriquecida con la información de átomos y enlaces.
-            - canvas (dict): Metadatos del lienzo (width, height).
-            - atoms (dict): Posiciones de los átomos.
-            - bonds (dict): Posiciones de los enlaces (inicio y fin de cada bond).
-            - mol_id (str): ID único asociado al SMILES canónico.
+            - smiles_canonical (str): SMILES canónico con hidrógenos explícitos.
+            - image_svg (str): Imagen SVG enriquecida con información atómica.
+            - canvas (dict): Dimensiones del lienzo.
+            - atoms (dict): Coordenadas de los átomos.
+            - bonds (dict): Coordenadas de los enlaces.
+            - mol_id (str): ID único de la molécula.
     """
     mol = Chem.MolFromSmiles(request.smiles)
     if mol is None:
@@ -33,16 +29,23 @@ def predict_bde_controller(request: PredictRequest) -> PredictResponse:
         Chem.SanitizeMol(mol)
     except (Chem.MolSanitizeException, Chem.KekulizeException) as e:
         raise ValueError(f"Error al sanitizar molécula: {e}")
-    smiles_canonical = Chem.MolToSmiles(mol, canonical=True)
+    mol = Chem.AddHs(mol)
+    smiles_canonical = Chem.MolToSmiles(mol, canonical=True, allHsExplicit=True)
     mol_id = hashlib.sha256(smiles_canonical.encode()).hexdigest()[:16]
+
+    # Generar coordenadas 2D
     try:
         from rdkit.Chem import rdCoordGen
         rdCoordGen.AddCoords(mol)
     except ImportError:
         AllChem.Compute2DCoords(mol)
+
+    # Determinar dimensiones del lienzo
     n_atoms = mol.GetNumAtoms()
     dimension = max(300, min(100 + 20 * n_atoms, 800))
     width, height = dimension, dimension
+
+    # Dibujar molécula en SVG
     drawer = rdMolDraw2D.MolDraw2DSVG(width, height)
     opts = drawer.drawOptions()
     opts.addStereoAnnotation = True
@@ -50,11 +53,15 @@ def predict_bde_controller(request: PredictRequest) -> PredictResponse:
     drawer.FinishDrawing()
     raw_svg = drawer.GetDrawingText()
     image_svg = ''.join(line.strip() for line in raw_svg.splitlines())
+
+    # Coordenadas de átomos
     atoms: Dict[str, Dict[str, float]] = {}
     for atom in mol.GetAtoms():
         idx = atom.GetIdx()
         pt = drawer.GetDrawCoords(idx)
         atoms[str(idx)] = {"x": float(pt.x), "y": float(pt.y)}
+
+    # Coordenadas de enlaces
     bonds: Dict[str, Dict[str, Dict[str, float]]] = {}
     for bond in mol.GetBonds():
         b_idx = bond.GetIdx()
@@ -76,6 +83,7 @@ def predict_bde_controller(request: PredictRequest) -> PredictResponse:
 
 
 
+
 def predict_single_bde_controller(request: PredictSingleRequest) -> PredictSingleResponse:
     """
     Controlador para la predicción de BDE de un enlace específico.
@@ -88,7 +96,6 @@ def predict_single_bde_controller(request: PredictSingleRequest) -> PredictSingl
         PredictSingleResponse:
             - bde (float): Valor de BDE predicho para el enlace.
     """
-    # Validar y canonizar SMILES
     mol = Chem.MolFromSmiles(request.smiles)
     if mol is None:
         raise ValueError(f"SMILES inválido: {request.smiles}")
@@ -96,29 +103,48 @@ def predict_single_bde_controller(request: PredictSingleRequest) -> PredictSingl
         Chem.SanitizeMol(mol)
     except (Chem.MolSanitizeException, Chem.KekulizeException) as e:
         raise ValueError(f"Error al sanitizar molécula: {e}")
-    
     smiles_canonical = Chem.MolToSmiles(mol, canonical=True)
     with torch.no_grad():
-           pred = single_predict(smiles_canonical, request.bond_idx)
-           if hasattr(pred, 'numpy'):
-               pred = pred.numpy()
-           bde = float(pred) if not hasattr(pred, '__len__') or len(pred) == 1 else float(pred[0])
-    return PredictSingleResponse(bde=432.1)  # Mocked value for demonstration
+        pred = single_predict(smiles_canonical, request.bond_idx)
+        if hasattr(pred, 'numpy'):
+            pred = pred.numpy()
+        bde = float(pred) if not hasattr(pred, '__len__') or len(pred) == 1 else float(pred[0])
+    return PredictSingleResponse(bde=bde)
 
 def predict_multiple_bde_controller(request: PredictMultipleRequest) -> PredictMultipleResponse:
     """
     Controlador para la predicción de BDE de múltiples enlaces de una molécula.
-
     Parámetros:
         request (PredictMultipleRequest):
             - smiles (str): SMILES de la molécula.
-            - bond_idxs (List[int]): Lista de índices de enlaces a predecir.
+            - bond_indices (List[int]): Lista de índices de enlaces a predecir.
     Devuelve:
         PredictMultipleResponse:
             - bonds (List[PredictMultipleBond]): Lista de enlaces con índice y BDE predicho.
     """
-    # MOCK
-    return PredictMultipleResponse(bonds=[
-        PredictMultipleBond(idx=1, bde=112.3),
-        PredictMultipleBond(idx=2, bde=110.5)
-    ])
+    mol = Chem.MolFromSmiles(request.smiles)
+    if mol is None:
+        raise ValueError(f"SMILES inválido: {request.smiles}")
+    try:
+        Chem.SanitizeMol(mol)
+    except (Chem.MolSanitizeException, Chem.KekulizeException) as e:
+        raise ValueError(f"Error al sanitizar molécula: {e}")
+    smiles_canonical = Chem.MolToSmiles(mol, canonical=True)
+    num_bonds = mol.GetNumBonds()
+    valid_indices = [idx for idx in request.bond_indices if 0 <= idx < num_bonds]
+    if not valid_indices:
+        return PredictMultipleResponse(bonds=[])
+    bonds = []
+    try:
+        for idx in valid_indices:
+            with torch.no_grad():
+                pred = single_predict(smiles_canonical, idx)
+                if hasattr(pred, 'numpy'):
+                    pred = pred.numpy()
+                bde = float(pred) if not hasattr(pred, '__len__') or len(pred) == 1 else float(pred[0])
+                bonds.append(PredictBond(idx=idx, bde=bde))
+        if not bonds or len(bonds) != len(valid_indices):
+            raise RuntimeError("The model cannot process the prediction for the requested smile or bonds.")
+        return PredictMultipleResponse(bonds=bonds)
+    except Exception:
+        raise RuntimeError("The model cannot process the prediction for the requested  smile or bonds.")
