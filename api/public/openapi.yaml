@@ -288,6 +288,7 @@ paths:
                         begin_atom: 0
                         end_atom: 1
                         bond_atoms: C-O
+                        bond_type: single
                         is_fragmentable: true
                       smiles_list:
                       - CC
@@ -360,11 +361,13 @@ paths:
                         begin_atom_idx: 0
                         end_atom_idx: 1
                         bond_atoms: C-O
+                        bond_type: single
                       - idx: 2
                         bde: 100.0
                         begin_atom_idx: 1
                         end_atom_idx: 2
                         bond_atoms: C-C
+                        bond_type: single
                     error: null
                   summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
@@ -458,6 +461,7 @@ paths:
                             x: 150.0
                             y: 100.0
                           bond_atoms: C-C
+                          bond_type: single
                         '1':
                           start: 1
                           end: 2
@@ -468,6 +472,7 @@ paths:
                             x: 250.0
                             y: 100.0
                           bond_atoms: C-O
+                          bond_type: single
                       molecule_id: a1b2c3d4e5f6a7b8
                     error: null
                   summary: Ejemplo exitoso
@@ -543,6 +548,7 @@ paths:
                         begin_atom_idx: 0
                         end_atom_idx: 1
                         bond_atoms: C-O
+                        bond_type: single
                       products:
                       - CC
                       - O
@@ -622,11 +628,13 @@ paths:
                         begin_atom_idx: 0
                         end_atom_idx: 1
                         bond_atoms: C-O
+                        bond_type: single
                       - idx: 2
                         bde: 100.0
                         begin_atom_idx: 1
                         end_atom_idx: 2
                         bond_atoms: C-C
+                        bond_type: single
                     error: null
                   summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
@@ -699,6 +707,7 @@ paths:
                         begin_atom_idx: 0
                         end_atom_idx: 1
                         bond_atoms: C-O
+                        bond_type: single
                     error: null
                   summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
@@ -924,6 +933,11 @@ components:
         bond_atoms:
           title: Bond Atoms
           type: string
+        bond_type:
+          allOf:
+          - $ref: '#/components/schemas/BondTypeEnum'
+          default: single
+          title: Bond Type
       required:
       - start
       - end
@@ -932,6 +946,13 @@ components:
       - bond_atoms
       title: Bond2D
       type: object
+    BondTypeEnum:
+      enum:
+      - single
+      - double
+      - triple
+      - aromatic
+      type: string
     DownloadReportRequest:
       description: |-
         Entrada para /download_report/.
@@ -1007,6 +1028,11 @@ components:
         bond_atoms:
           title: Bond Atoms
           type: string
+        bond_type:
+          allOf:
+          - $ref: '#/components/schemas/BondTypeEnum'
+          default: single
+          title: Bond Type
         is_fragmentable:
           title: Is Fragmentable
           type: boolean
@@ -1330,8 +1356,10 @@ components:
           title: Idx
           type: integer
         bde:
+          anyOf:
+          - type: number
+          - type: 'null'
           title: Bde
-          type: number
         begin_atom_idx:
           title: Begin Atom Idx
           type: integer
@@ -1341,6 +1369,11 @@ components:
         bond_atoms:
           title: Bond Atoms
           type: string
+        bond_type:
+          allOf:
+          - $ref: '#/components/schemas/BondTypeEnum'
+          default: single
+          title: Bond Type
       required:
       - idx
       - bde
