@@ -31,9 +31,6 @@ def generate_id_smiles(smiles: str) -> tuple[Chem.Mol, str, str]:
     smiles_canonical = Chem.MolToSmiles(mol,  canonical=True, allHsExplicit=True,kekuleSmiles =True,isomericSmiles=True)
 
     mol_id = hashlib.sha256(smiles_canonical.encode()).hexdigest()[:16]
-    logger.info(f"Received SMILES: {smiles}")
-    logger.info(f"Canonical SMILES: {smiles_canonical}")
-    logger.info(f"Generated molecule ID: {mol_id}")
     return  mol, mol_id, smiles_canonical
 
 def verify_smiles(smiles: str, mol_id: str) -> bool:
@@ -125,13 +122,25 @@ def predict_controller(request: PredictRequest) -> PredictResponseData:
         end_pt = drawer.GetDrawCoords(end_idx)
         atom1 = mol.GetAtomWithIdx(start_idx)
         atom2 = mol.GetAtomWithIdx(end_idx)
+        bond_type = bond.GetBondType()
+        if bond_type == Chem.BondType.SINGLE:
+            bond_type_str = "single"
+        elif bond_type == Chem.BondType.DOUBLE:
+            bond_type_str = "double"
+        elif bond_type == Chem.BondType.TRIPLE:
+            bond_type_str = "triple"
+        elif bond_type == Chem.BondType.AROMATIC:
+            bond_type_str = "aromatic"
+        else:
+            bond_type_str = str(bond_type)
         bond_atoms = f"{atom1.GetSymbol()}-{atom2.GetSymbol()}"
         bonds[str(b_idx)] = Bond2D(
             start=start_idx,
             end=end_idx,
             start_coords={"x": float(start_pt.x), "y": float(start_pt.y)},
             end_coords={"x": float(end_pt.x), "y": float(end_pt.y)},
-            bond_atoms=bond_atoms
+            bond_atoms=bond_atoms,
+            bond_type=bond_type_str
         )
     canvas = {"width": width, "height": height}
     return PredictResponseData(
@@ -162,6 +171,17 @@ def predict_single_controller(request: PredictSingleRequest) -> PredictSingleRes
     end_atom_idx = bond.GetEndAtomIdx()
     atom1 = mol.GetAtomWithIdx(begin_atom_idx)
     atom2 = mol.GetAtomWithIdx(end_atom_idx)
+    bond_type = bond.GetBondType()
+    if bond_type == Chem.BondType.SINGLE:
+        bond_type_str = "single"
+    elif bond_type == Chem.BondType.DOUBLE:
+        bond_type_str = "double"
+    elif bond_type == Chem.BondType.TRIPLE:
+        bond_type_str = "triple"
+    elif bond_type == Chem.BondType.AROMATIC:
+        bond_type_str = "aromatic"
+    else:
+        bond_type_str = str(bond_type)
     bond_atoms = f"{atom1.GetSymbol()}-{atom2.GetSymbol()}"
     import torch
     with torch.no_grad():
@@ -174,7 +194,8 @@ def predict_single_controller(request: PredictSingleRequest) -> PredictSingleRes
         bde=bde,
         begin_atom_idx=begin_atom_idx,
         end_atom_idx=end_atom_idx,
-        bond_atoms=bond_atoms
+        bond_atoms=bond_atoms,
+        bond_type=bond_type_str
     )
     return PredictSingleResponseData(
         smiles_canonical=smiles_canonical,
@@ -212,14 +233,12 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
     if errors:
         logger.error(f"Índices de enlace inválidos: {errors}")
         raise ValueError(f"Invalid bond indices: {errors}")
-
     try:
         bde_array = multi_predict(smiles_canonical, bond_indices)
         bde_list = bde_array.numpy().tolist() if hasattr(bde_array, 'numpy') else list(bde_array)
     except Exception as e:
         logger.error(f"Error en multi_predict: {e}")
         raise ValueError(f"Error in multi_predict: {e}")
-    
     bonds = []
     for idx, bde in zip(bond_indices, bde_list):
         bond = mol.GetBondWithIdx(idx)
@@ -227,10 +246,18 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
         end_atom_idx = bond.GetEndAtomIdx()
         begin_atom = mol.GetAtomWithIdx(begin_atom_idx)
         end_atom = mol.GetAtomWithIdx(end_atom_idx)
+        bond_type = bond.GetBondType()
+        if bond_type == Chem.BondType.SINGLE:
+            bond_type_str = "single"
+        elif bond_type == Chem.BondType.DOUBLE:
+            bond_type_str = "double"
+        elif bond_type == Chem.BondType.TRIPLE:
+            bond_type_str = "triple"
+        elif bond_type == Chem.BondType.AROMATIC:
+            bond_type_str = "aromatic"
+        else:
+            bond_type_str = str(bond_type)
         bond_atoms = f"{begin_atom.GetSymbol()}-{end_atom.GetSymbol()}"
-        # Logging para depuración
-        logger.info(f"Predicción BDE para idx={idx}: valor={bde} tipo={type(bde)}")
-        # Si bde es una lista, tomar el primer elemento
         if isinstance(bde, list) and len(bde) > 0:
             bde = bde[0]
         try:
@@ -243,7 +270,8 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
             bde=bde_float,
             begin_atom_idx=begin_atom_idx,
             end_atom_idx=end_atom_idx,
-            bond_atoms=bond_atoms
+            bond_atoms=bond_atoms,
+            bond_type=bond_type_str
         ))
 
     return PredictMultipleResponseData(
@@ -257,7 +285,7 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
 
 def fragment_controller(request: FragmentRequest) -> FragmentResponseData:
     bonds = [
-        EvaluatedFragmentBond(idx=0, begin_atom=0, end_atom=1, bond_atoms="C-C", is_fragmentable=True)
+        EvaluatedFragmentBond(idx=0, begin_atom=0, end_atom=1, bond_atoms="C-C", bond_type="single", is_fragmentable=True)
     ]
     smiles_list = ["CCO", "CC", "O"] if request.export_smiles else None
     xyz_block = "...XYZ data..." if request.export_xyz else None
@@ -282,13 +310,44 @@ def predict_check_controller(request: PredictCheckRequest) -> PredictCheckRespon
     )
 
 def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
-    bonds = [
-        PredictedBond(idx=0, bde=112.3, begin_atom_idx=0, end_atom_idx=1, bond_atoms="C-O"),
-        PredictedBond(idx=1, bde=110.5, begin_atom_idx=1, end_atom_idx=2, bond_atoms="C-C")
-    ]
+    from deepbde.architecture.inference_util import predict_all
+    mol, mol_id, smiles_canonical = generate_id_smiles(request.smiles)
+    bond_idxs, preds = predict_all(smiles_canonical)
+    bonds = []
+    for idx, pred in zip(bond_idxs, preds.numpy()):
+        bond = mol.GetBondWithIdx(idx)
+        begin_atom_idx = bond.GetBeginAtomIdx()
+        end_atom_idx = bond.GetEndAtomIdx()
+        atom1 = mol.GetAtomWithIdx(begin_atom_idx)
+        atom2 = mol.GetAtomWithIdx(end_atom_idx)
+        bond_type = bond.GetBondType()
+        if bond_type == Chem.BondType.SINGLE:
+            bond_type_str = "single"
+            bde = float(pred)
+        elif bond_type == Chem.BondType.DOUBLE:
+            bond_type_str = "double"
+            bde = None
+        elif bond_type == Chem.BondType.TRIPLE:
+            bond_type_str = "triple"
+            bde = None
+        elif bond_type == Chem.BondType.AROMATIC:
+            bond_type_str = "aromatic"
+            bde = None
+        else:
+            bond_type_str = str(bond_type)
+            bde = None
+        bond_atoms = f"{atom1.GetSymbol()}-{atom2.GetSymbol()}"
+        bonds.append(PredictedBond(
+            idx=idx,
+            bde=bde,
+            begin_atom_idx=begin_atom_idx,
+            end_atom_idx=end_atom_idx,
+            bond_atoms=bond_atoms,
+            bond_type=bond_type_str
+        ))
     return InferAllResponseData(
-        smiles_canonical=request.smiles,
-        molecule_id="a1b2c3d4e5f6a7b8",
+        smiles_canonical=smiles_canonical,
+        molecule_id=mol_id,
         bonds=bonds
     )
 

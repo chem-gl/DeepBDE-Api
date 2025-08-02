@@ -30,10 +30,12 @@ class PredictedBond(BaseModel):
     - bond_atoms: Representación legible del enlace (ejemplo: 'C-O').
     """
     idx: int  # Índice del enlace en la molécula.
-    bde: float  # Energía de disociación predicha para el enlace.
+    bde: Optional[float]  # Energía de disociación predicha para el enlace o None si no se pudo predecir por el tipo de enlace.
     begin_atom_idx: int  # Índice del átomo inicial del enlace.
     end_atom_idx: int  # Índice del átomo final del enlace.
     bond_atoms: str  # Representación legible del enlace (ejemplo: 'C-O').
+    bond_type: Literal["single", "double", "triple", "aromatic"] = "single" 
+
 
 class EvaluatedFragmentBond(BaseModel):
     """
@@ -48,6 +50,7 @@ class EvaluatedFragmentBond(BaseModel):
     begin_atom: int  # Índice del átomo inicial del enlace.
     end_atom: int  # Índice del átomo final del enlace.
     bond_atoms: str  # Representación legible del enlace (ejemplo: 'C-H').
+    bond_type: Literal["single", "double", "triple", "aromatic"] = "single"
     is_fragmentable: bool  # Indica si el enlace puede fragmentarse (enlace simple, etc.).
 
 class Atom2D(BaseModel):
@@ -77,7 +80,7 @@ class Bond2D(BaseModel):
     start_coords: Dict[str, float]
     end_coords: Dict[str, float]
     bond_atoms: str
-
+    bond_type: Literal["single", "double", "triple", "aromatic"] = "single" 
 # ---------- Plantilla de respuesta API ----------
 T = TypeVar('T')
 

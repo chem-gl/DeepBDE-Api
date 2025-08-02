@@ -38,10 +38,6 @@ def _handle_validation_error(e: ValidationError, status_code=400):
     payload = APIResponse[None](status="error", error=detail).model_dump()
     return Response(payload, status=status_code)
 
-
-
-
-
 class PredictView(APIView):
     """
     Endpoint para obtener la imagen 2D de la molécula y la lista de enlaces con sus índices y átomos involucrados (sin predecir BDEs).
@@ -63,14 +59,16 @@ class PredictView(APIView):
                     "end": 1,
                     "start_coords": {"x": 50.0, "y": 100.0},
                     "end_coords": {"x": 150.0, "y": 100.0},
-                    "bond_atoms": "C-C"
+                    "bond_atoms": "C-C",
+                    "bond_type": "single"
                 },
                 "1": {
                     "start": 1,
                     "end": 2,
                     "start_coords": {"x": 150.0, "y": 100.0},
                     "end_coords": {"x": 250.0, "y": 100.0},
-                    "bond_atoms": "C-O"
+                    "bond_atoms": "C-O",
+                    "bond_type": "single"
                 }
             },
             molecule_id="a1b2c3d4e5f6a7b8"
@@ -148,7 +146,8 @@ class PredictSingleView(APIView):
                 "bde": 95.0,
                 "begin_atom_idx": 0,
                 "end_atom_idx": 1,
-                "bond_atoms": "C-O"
+                "bond_atoms": "C-O",
+                "bond_type": "single"
             }
         )
     ).model_dump()
@@ -224,14 +223,16 @@ class PredictMultipleView(APIView):
                     "bde": 95.0,
                     "begin_atom_idx": 0,
                     "end_atom_idx": 1,
-                    "bond_atoms": "C-O"
+                    "bond_atoms": "C-O",
+                    "bond_type": "single"
                 },
                 {
                     "idx": 2,
                     "bde": 100.0,
                     "begin_atom_idx": 1,
                     "end_atom_idx": 2,
-                    "bond_atoms": "C-C"
+                    "bond_atoms": "C-C",
+                    "bond_type": "single"
                 }
             ]
         )
@@ -314,7 +315,8 @@ class FragmentView(APIView):
                     "begin_atom": 0,
                     "end_atom": 1,
                     "bond_atoms": "C-O",
-                    "is_fragmentable": True
+                    "is_fragmentable": True,
+                    "bond_type": "single"
                 }
             ],
             smiles_list=["CC", "O"],
@@ -391,7 +393,8 @@ class PredictCheckView(APIView):
                 "bde": 95.0,
                 "begin_atom_idx": 0,
                 "end_atom_idx": 1,
-                "bond_atoms": "C-O"
+                "bond_atoms": "C-O",
+                "bond_type": "single"
             },
             products=["CC", "O"]
         )
@@ -468,14 +471,16 @@ class InferAllView(APIView):
                     "bde": 95.0,
                     "begin_atom_idx": 0,
                     "end_atom_idx": 1,
-                    "bond_atoms": "C-O"
+                    "bond_atoms": "C-O",
+                    "bond_type": "single"
                 },
                 {
                     "idx": 2,
                     "bde": 100.0,
                     "begin_atom_idx": 1,
                     "end_atom_idx": 2,
-                    "bond_atoms": "C-C"
+                    "bond_atoms": "C-C",
+                    "bond_type": "single"
                 }
             ]
         )
