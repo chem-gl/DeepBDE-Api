@@ -28,6 +28,7 @@ class MoleculeInfo:
     - bonds: Diccionario con información 2D de enlaces
     - image_svg: Representación SVG enriquecida de la molécula
     """
+    mol: Chem.Mol
     molecule_id: str
     smiles_canonical: str
     canvas: Dict[str, int]
@@ -52,7 +53,6 @@ def generate_id_smiles(smiles: str) -> Tuple[Chem.Mol, str, str]:
     Chem.SanitizeMol(mol)
     mol = Chem.AddHs(mol)
     smiles_canonical = Chem.MolToSmiles(mol, canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True)
-    # Ensure the molecule is always generated the same way
     mol = Chem.MolFromSmiles(smiles_canonical)  
     Chem.SanitizeMol(mol)
     mol = Chem.AddHs(mol)
@@ -107,7 +107,7 @@ def calculate_canvas_size(mol: Chem.Mol, padding: int = 50, min_size: int = 300)
     return {"width": max(width, min_size), "height": max(height, min_size)}
 
 def generate_molecule_svg(mol: Chem.Mol, canvas: Dict[str, int]) -> Tuple[str, rdMolDraw2D.MolDraw2DSVG]:
-    """Generates an SVG representation of the molecule with atom indices.
+    """Generates an SVG representation of the molecule with atom and bond indices in the default color.
     Args:
         mol (Chem.Mol): The RDKit molecule object with 2D coordinates.
         canvas (Dict[str, int]): Dictionary with 'width' and 'height' of the canvas.
@@ -119,7 +119,8 @@ def generate_molecule_svg(mol: Chem.Mol, canvas: Dict[str, int]) -> Tuple[str, r
     opts.addStereoAnnotation = True
     opts.explicitMethyl = True
     opts.includeAtomTags = True
-    opts.addAtomIndices = True  # Enable atom indices in the SVG
+    opts.addAtomIndices = True  # Enable atom indices in the default color (typically black)
+    opts.addBondIndices = True  # Enable bond indices in the default color (typically black)
     drawer.DrawMolecule(mol)
     drawer.FinishDrawing()
     raw_svg = drawer.GetDrawingText()
@@ -198,10 +199,10 @@ def get_all_info_molecule(smiles: str) -> MoleculeInfo:
     image_svg, drawer = generate_molecule_svg(mol, canvas)
     atoms = get_atoms_info(mol, drawer)
     bonds = get_bonds_info(mol, drawer)
-    # Verify consistency of indices
     assert len(atoms) == mol.GetNumAtoms(), f"Atom count mismatch: expected {mol.GetNumAtoms()}, got {len(atoms)}"
     assert len(bonds) == mol.GetNumBonds(), f"Bond count mismatch: expected {mol.GetNumBonds()}, got {len(bonds)}"
     return MoleculeInfo(
+        mol=mol,
         molecule_id=mol_id,
         smiles_canonical=smiles_canonical,
         canvas=canvas,
@@ -227,7 +228,6 @@ def predict_controller(request: PredictRequest) -> PredictResponseData:
         molecule_id=all_info.molecule_id
     )
 
-
 def predict_single_controller(request: PredictSingleRequest) -> PredictSingleResponseData:
     """
     Controller para la predicción de BDE de un único enlace de una molécula.
@@ -238,20 +238,16 @@ def predict_single_controller(request: PredictSingleRequest) -> PredictSingleRes
     """
     all_info = get_all_info_molecule(request.smiles)
     verify_smiles(all_info.smiles_canonical, request.molecule_id)
-
-    mol = Chem.MolFromSmiles(all_info.smiles_canonical)
-
+    mol = all_info.mol
     if not is_single_bond(mol, request.bond_idx):
         raise ValueError(f"Bond index {request.bond_idx} is not a single bond.")
-
     bond = mol.GetBondWithIdx(request.bond_idx)
     begin_idx = bond.GetBeginAtomIdx()
     end_idx = bond.GetEndAtomIdx()
     atom1 = mol.GetAtomWithIdx(begin_idx)
     atom2 = mol.GetAtomWithIdx(end_idx)
-
     bde = single_predict(all_info.smiles_canonical, request.bond_idx)
-
+    
     predicted_bond = PredictedBond(
         idx=request.bond_idx,
         bde=bde,
@@ -260,12 +256,10 @@ def predict_single_controller(request: PredictSingleRequest) -> PredictSingleRes
         bond_atoms=f"{atom1.GetSymbol()}-{atom2.GetSymbol()}",
         bond_type=bond.GetBondType().name.lower()
     )
-
     return PredictSingleResponseData(
         smiles_canonical=all_info.smiles_canonical,
         bond=predicted_bond
     )
-
 
 def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMultipleResponseData:
     """
@@ -277,18 +271,66 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
     Returns:
         PredictMultipleResponseData: Respuesta con la lista de enlaces y sus BDEs predichos.
     """
-    pass
+    all_info = get_all_info_molecule(request.smiles)
+    verify_smiles(all_info.smiles_canonical, request.molecule_id)
+    mol = all_info.mol
+    bonds = []
+    for idx in request.bond_indices:
+        if not is_single_bond(mol, idx):
+            raise ValueError(f"Bond index {idx} is not a single bond.")
+    # Predecir BDEs para todos los enlaces
+    bde_list = multi_predict(all_info.smiles_canonical, request.bond_indices)
+    for i, idx in enumerate(request.bond_indices):
+        bond = mol.GetBondWithIdx(idx)
+        begin_idx = bond.GetBeginAtomIdx()
+        end_idx = bond.GetEndAtomIdx()
+        atom1 = mol.GetAtomWithIdx(begin_idx)
+        atom2 = mol.GetAtomWithIdx(end_idx)
+        bde = bde_list[i].item() if hasattr(bde_list[i], 'item') else float(bde_list[i])
+        predicted_bond = PredictedBond(
+            idx=idx,
+            bde=bde,
+            begin_atom_idx=begin_idx,
+            end_atom_idx=end_idx,
+            bond_atoms=f"{atom1.GetSymbol()}-{atom2.GetSymbol()}",
+            bond_type=bond.GetBondType().name.lower()
+        )
+        bonds.append(predicted_bond)
+    return PredictMultipleResponseData(
+        smiles=all_info.smiles_canonical,
+        molecule_id=all_info.molecule_id,
+        bonds=bonds
+    )
+def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
+    """
+    Controller para inferir la BDE de todos los enlaces posibles de una molécula.
+    Args:
+        request (InferAllRequest): Contiene el SMILES de la molécula.
+    Returns:
+        InferAllResponseData: Respuesta con la lista de enlaces y sus BDEs predichos o null si no se pueden predecir.
+    """
+    all_info = get_all_info_molecule(request.smiles)
+    mol = all_info.mol
 
-
-
+    # Obtener todos los índices de enlaces
+    allbonds = all_info.bonds
+    bonds_indices = []
+    for idx, bond in allbonds.items():
+        if (bond.bond_type == "single") and bond.start < bond.end:
+            bonds_indices.append(int(idx))
+    if not bonds_indices:
+        return InferAllResponseData(
+            smiles=all_info.smiles_canonical,
+            molecule_id=all_info.molecule_id,
+            bonds=None
+        )
+    logger.info(f"Se probaran los indices de enlaces: {bonds_indices}")
 
 def fragment_controller(request: FragmentRequest) -> FragmentResponseData:
     pass
 def predict_check_controller(request: PredictCheckRequest) -> PredictCheckResponseData:
     pass
 
-def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
-    pass
 
 def download_report_controller(request: DownloadReportRequest) -> DownloadReportResponseData:
     return DownloadReportResponseData(
