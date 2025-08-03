@@ -1,3 +1,32 @@
+import os
+import pickle
+
+# Disk-based cache for SMILES queries (easy to clear by deleting folder)
+CACHE_VERSION = "v1"  # Change this to invalidate all cache
+CACHE_DIR = os.path.join(os.path.dirname(__file__), "_cache", CACHE_VERSION)
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+def _cache_path(key: str) -> str:
+    safe_key = key.replace(os.sep, "_").replace(":", "_")
+    return os.path.join(CACHE_DIR, f"{safe_key}.pkl")
+
+def _cache_get(key: str):
+    path = _cache_path(key)
+    if os.path.exists(path):
+        try:
+            with open(path, "rb") as f:
+                return pickle.load(f)
+        except Exception:
+            return None
+    return None
+
+def _cache_set(key: str, value):
+    path = _cache_path(key)
+    try:
+        with open(path, "wb") as f:
+            pickle.dump(value, f)
+    except Exception:
+        pass
 from typing import Literal, cast
 import base64
 from typing import Dict, Tuple
@@ -17,7 +46,7 @@ from rdkit.Chem.Draw import rdMolDraw2D
 import hashlib
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-from deepbde.architecture.inference_util import multi_predict, single_predict
+from deepbde.architecture.inference_util import single_predict
 @dataclass
 class MoleculeInfo:
     """
@@ -62,31 +91,40 @@ def generate_id_smiles(smiles: str) -> Tuple[Chem.Mol, str, str]:
     return mol, mol_id, smiles_canonical
 
 def verify_smiles(smiles: str, mol_id: str) -> bool:
-    """Verifies if the provided molecule ID matches the generated ID from SMILES.
-    
+    """
+    Verifies if the provided molecule ID matches the generated ID from SMILES.
     Args:
         smiles (str): The SMILES representation of the molecule.
         mol_id (str): Unique ID to verify.
     Returns:
         bool: True if IDs match, raises ValueError otherwise.
+    Raises:
+        ValueError: If the SMILES is invalid or the ID does not match.
     """
-    real_mol_id = generate_id_smiles(smiles)[1]
+    try:
+        real_mol_id = generate_id_smiles(smiles)[1]
+    except Exception as e:
+        raise ValueError(f"SMILES inválido: '{smiles}'. Error: {e}")
     if mol_id != real_mol_id:
-        raise ValueError(f"SMILES ID mismatch: expected {real_mol_id}, got {mol_id}")
+        raise ValueError(f"El ID de la molécula no coincide. SMILES: '{smiles}', ID esperado: '{real_mol_id}', ID recibido: '{mol_id}'")
     return True
 
 def is_valid_for_bde(mol: MoleculeInfo, bond_idx: int) -> bool:
-    """Checks if a bond at the given index is a single bond.
+    """
+    Checks if a bond at the given index is a single, non-cyclic bond.
+    Only single, non-cyclic bonds are valid for BDE prediction because the model is trained on such cases and cyclic bonds have different dissociation behavior.
     Args:
         mol (MoleculeInfo): The molecule information object.
         bond_idx (int): The index of the bond to check.
     Returns:
-        bool: True if the bond is single, False otherwise.
+        bool: True if the bond is single and not in a ring, False otherwise.
+    Raises:
+        ValueError: If the bond index is out of range.
     """
     if bond_idx < 0 or bond_idx >= mol.GetNumBonds(): # pyright: ignore[reportAttributeAccessIssue]
-        raise ValueError(f"Bond index {bond_idx} out of range for molecule with {mol.GetNumBonds()} bonds") # pyright: ignore[reportAttributeAccessIssue]
+        raise ValueError(f"Índice de enlace {bond_idx} fuera de rango para la molécula con {mol.GetNumBonds()} enlaces") # pyright: ignore[reportAttributeAccessIssue]
     bond = mol.GetBondWithIdx(bond_idx) # type: ignore
-    return bond.GetBondType() ==  (Chem.BondType.SINGLE and not bond.IsInRing()) # pyright: ignore[reportAttributeAccessIssue]
+    return bond.GetBondType() == Chem.BondType.SINGLE and not bond.IsInRing()
 
 def calculate_canvas_size(mol: Chem.Mol, padding: int = 50, min_size: int = 300) -> Dict[str, int]:
     """Calculates the canvas size based on the molecule's bounding box.
@@ -188,12 +226,25 @@ def get_bonds_info(mol: Chem.Mol, drawer: rdMolDraw2D.MolDraw2DSVG) -> Dict[str,
 def get_all_info_molecule(smiles: str) -> MoleculeInfo:
     """
     Extracts all relevant information from a molecule given its SMILES representation.
+    Sanitizes and validates the SMILES before processing.
     Args:
         smiles (str): The SMILES representation of the molecule.
     Returns:
         MoleculeInfo: An object containing all relevant information about the molecule.
+    Raises:
+        ValueError: If the SMILES is invalid.
     """
-    mol, mol_id, smiles_canonical = generate_id_smiles(smiles)
+    """
+    Extracts all relevant information from a molecule given its SMILES representation.
+    Uses a simple cache to avoid recomputation for repeated SMILES queries.
+    """
+    cached = _cache_get(f"info_{smiles}")
+    if cached is not None:
+        return cached
+    try:
+        mol, mol_id, smiles_canonical = generate_id_smiles(smiles)
+    except Exception as e:
+        raise ValueError(f"SMILES inválido: '{smiles}'. Error: {e}")
     AllChem.Compute2DCoords(mol) # pyright: ignore[reportAttributeAccessIssue]
     canvas = calculate_canvas_size(mol)
     image_svg, drawer = generate_molecule_svg(mol, canvas)
@@ -201,7 +252,7 @@ def get_all_info_molecule(smiles: str) -> MoleculeInfo:
     bonds = get_bonds_info(mol, drawer)
     assert len(atoms) == mol.GetNumAtoms(), f"Atom count mismatch: expected {mol.GetNumAtoms()}, got {len(atoms)}"
     assert len(bonds) == mol.GetNumBonds(), f"Bond count mismatch: expected {mol.GetNumBonds()}, got {len(bonds)}"
-    return MoleculeInfo(
+    info = MoleculeInfo(
         mol=mol,
         molecule_id=mol_id,
         smiles_canonical=smiles_canonical,
@@ -210,6 +261,8 @@ def get_all_info_molecule(smiles: str) -> MoleculeInfo:
         bonds=bonds,
         image_svg=image_svg
     )
+    _cache_set(f"info_{smiles}", info)
+    return info
     
 def molecule_info_controller(request: MoleculeInfoRequest) -> MoleculeInfoResponseData:
     """Controller for predicting the bond dissociation energy (BDE) of a molecule.
@@ -238,10 +291,20 @@ def get_bde_for_bond_indices(mol_info: MoleculeInfo, idx: int ) -> float | None:
     Returns:
         float: The predicted BDE for the specified bond.
     """
+    """
+    Predicts the bond dissociation energy (BDE) for a specific bond index in a molecule.
+    Uses a simple cache for repeated queries on the same molecule and bond index.
+    """
+    cache_key = f"bde_{mol_info.smiles_canonical}_{idx}"
+    cached = _cache_get(cache_key)
+    if isinstance(cached, (float, int)):
+        return cached
     if not is_valid_for_bde(mol_info.mol, idx):
         return None
     bde = single_predict(mol_info.smiles_canonical, idx)
-    return bde.item() if isinstance(bde, torch.Tensor) else bde
+    bde_val = bde.item() if isinstance(bde, torch.Tensor) else bde
+    _cache_set(cache_key, bde_val)
+    return bde_val
     
 def predict_single_controller(request: PredictSingleRequest) -> PredictSingleResponseData:
     """
@@ -365,21 +428,26 @@ def get_fragments_from_bond(mol: Chem.Mol, bond_idx: int) -> list[str]:
     Returns:
         list[str]: A list of SMILES strings for the two fragments.
     """
+    """
+    Gets the two fragments generated by breaking a bond in a molecule.
+    Uses a simple cache for repeated queries on the same molecule and bond index.
+    """
+    cache_key = f"frag_{Chem.MolToSmiles(mol, canonical=True)}_{bond_idx}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     try:
-        # Create a copy of the molecule to modify
         mol_copy = Chem.RWMol(mol)
         bond = mol_copy.GetBondWithIdx(bond_idx)
         begin_idx = bond.GetBeginAtomIdx()
         end_idx = bond.GetEndAtomIdx()
-
-        # Remove the bond to split the molecule into fragments
         mol_copy.RemoveBond(begin_idx, end_idx)
-
-        # Get the fragments as SMILES
         fragments = Chem.GetMolFrags(mol_copy, asMols=True)
-        return [Chem.MolToSmiles(frag, canonical=True) for frag in fragments]
+        result = [Chem.MolToSmiles(frag, canonical=True) for frag in fragments]
+        _cache_set(cache_key, result)
+        return result
     except Exception as e:
-        logger.error(f"Error fragmenting bond {bond_idx}: {e}")
+        logger.error(f"Error fragmentando el enlace {bond_idx}: {e}")
         return []
 
 def  report_txt(smile:str) -> str:
@@ -391,11 +459,15 @@ def  report_txt(smile:str) -> str:
     """
     # El txt debe tener el smile introducido el id, todas las bde 
     # y que enlaces se selecciono y que moleculas da como resultado al romper el enlace.
-    all_info = get_all_info_molecule(smile)
+    try:
+        all_info = get_all_info_molecule(smile)
+    except Exception as e:
+        logger.error(f"Error al procesar el SMILES '{smile}': {e}")
+        return f"Error: SMILES inválido ({smile}). Detalle: {e}"
     report_lines = [
-        f"SMILES introduced: {smile}",
-        f"Canonical SMILES with Hs: {all_info.smiles_canonical}",
-        "Bonds and BDEs:"
+        f"SMILES introducido: {smile}",
+        f"SMILES canónico con Hs: {all_info.smiles_canonical}",
+        "Enlaces y BDEs:"
     ]
     for bond in all_info.mol.GetBonds():
         bond_idx = bond.GetIdx()
@@ -405,20 +477,23 @@ def  report_txt(smile:str) -> str:
         atom2 = all_info.mol.GetAtomWithIdx(end_idx)
         bde = get_bde_for_bond_indices(all_info, bond_idx)
         report_lines.append(
-            f"Bond {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()} (BDE: {bde})"
+            f"Enlace {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()} (BDE: {bde})"
         )
-    report_lines.append("Fragmentation Results:")
+    report_lines.append("Resultados de fragmentación:")
     for bond in all_info.mol.GetBonds():
         bond_idx = bond.GetIdx()
         bde = get_bde_for_bond_indices(all_info, bond_idx)
         if bde is not None:
             fragments = get_fragments_from_bond(all_info.mol, bond_idx)
             report_lines.append(
-                f"Fragment from Bond {bond_idx}: (BDE: {bde})"
+                f"Fragmento del enlace {bond_idx}: (BDE: {bde})"
             )
-            report_lines.append(f"Generated Fragments: {fragments[0]} and {fragments[1]}")
+            if len(fragments) == 2:
+                report_lines.append(f"Fragmentos generados: {fragments[0]} y {fragments[1]}")
+            else:
+                report_lines.append(f"Fragmentación inválida para el enlace {bond_idx}")
     report_lines="\n".join(report_lines)
-    logger.info("Generated report:\n%s", report_lines)    
+    logger.info("Reporte generado:\n%s", report_lines)    
     return report_lines
 
 
@@ -441,22 +516,23 @@ def download_report_controller(request: DownloadReportRequest) -> DownloadReport
     )
 
 def predict_check_controller(request: PredictCheckRequest) -> PredictCheckResponseData: #ignore
-    all_info = get_all_info_molecule(request.smiles)
-    if not verify_smiles(all_info.smiles_canonical, request.molecule_id):
-        raise ValueError(f"SMILES ID mismatch: expected {all_info.molecule_id}, got {request.molecule_id}")
-    if( not is_valid_for_bde(all_info.mol, request.bond_idx)):
-        raise ValueError(f"Bond index {request.bond_idx} is not a single bond or is in a ring.")
-    
+    try:
+        all_info = get_all_info_molecule(request.smiles)
+        verify_smiles(all_info.smiles_canonical, request.molecule_id)
+        if not is_valid_for_bde(all_info.mol, request.bond_idx):
+            raise ValueError(f"El índice de enlace {request.bond_idx} no corresponde a un enlace simple no cíclico.")
+    except Exception as e:
+        logger.error(f"Error en predict_check_controller: {e}")
+        raise ValueError(f"Error de validación: {e}")
+
     mol = all_info.mol
     bond_idx = request.bond_idx
-    # Get bond and atom info
     bond = mol.GetBondWithIdx(bond_idx)
     begin_idx = bond.GetBeginAtomIdx()
     end_idx = bond.GetEndAtomIdx()
     atom1 = mol.GetAtomWithIdx(begin_idx)
     atom2 = mol.GetAtomWithIdx(end_idx)
     bde = get_bde_for_bond_indices(all_info, bond_idx)
-    # Build PredictedBond
     predicted_bond = PredictedBond(
         idx=bond_idx,
         bde=bde,
@@ -465,15 +541,15 @@ def predict_check_controller(request: PredictCheckRequest) -> PredictCheckRespon
         bond_atoms=f"{atom1.GetSymbol()}-{atom2.GetSymbol()}",
         bond_type=bond.GetBondType().name.lower()
     )
+    # Validate input products are valid SMILES
+    invalid_smiles = [s for s in request.products if Chem.MolFromSmiles(s) is None]
+    if invalid_smiles:
+        logger.error(f"SMILES inválidos en productos: {invalid_smiles}")
+        raise ValueError(f"Uno o más productos no son SMILES válidos: {invalid_smiles}")
     # Get generated products (fragments)
     products = get_fragments_from_bond(mol, bond_idx)
-    
-    # Canonicalize generated products
     products_canonical = [Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True) for s in products if Chem.MolFromSmiles(s) is not None]
-    # Canonicalize input products
     input_products_canonical = [Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True) for s in request.products if Chem.MolFromSmiles(s) is not None]
-    
-    # If BDE is None or no products, return incompatible bond
     if bde is None or not products_canonical:
         return PredictCheckResponseData(
             smiles_canonical=all_info.smiles_canonical,
@@ -481,8 +557,6 @@ def predict_check_controller(request: PredictCheckRequest) -> PredictCheckRespon
             are_same_products=False,
             products=["incompatible bond"]
         )
-    
-    # Check if input products match generated products (order-insensitive)
     are_same_products = set(products_canonical) == set(input_products_canonical)
     return PredictCheckResponseData(
         smiles_canonical=all_info.smiles_canonical,

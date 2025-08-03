@@ -509,7 +509,7 @@ class PredictCheckView(APIView):
                 "Entrada de ejemplo / Example input",
                 value={"smiles": "CCO", "bond_idx": 1, 
                        "molecule_id": "150018eccd174140",
-                       "products": ["CC", "O"] },
+                       "products": ["[CH2][OH]", "[CH3]"]},
                 request_only=True
                 
             ),
