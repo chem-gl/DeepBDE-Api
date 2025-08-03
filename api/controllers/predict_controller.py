@@ -333,12 +333,10 @@ def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
         end_idx = bond.GetEndAtomIdx()
         atom1 = mol.GetAtomWithIdx(begin_idx)
         atom2 = mol.GetAtomWithIdx(end_idx)
-
         if is_valid_for_bde(mol, bond_idx):
             bde = get_bde_for_bond_indices(all_info, bond_idx)
         else:
             bde = None
-
         predicted_bond = PredictedBond(
             idx=bond_idx,
             bde=bde,
@@ -348,7 +346,6 @@ def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
             bond_type=bond.GetBondType().name.lower()
         )
         predicted_bonds.append(predicted_bond)
-
     return InferAllResponseData(
         smiles_canonical=all_info.smiles_canonical,
         molecule_id=all_info.molecule_id,
