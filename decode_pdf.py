@@ -7,7 +7,7 @@ url = "http://localhost:8000/api/v1/download_report/"
 # Datos de la solicitud
 data = {
     "smiles": "CCO",
-    "format": "pdf"
+    "format": "txt"
 }
 
 # Encabezados
