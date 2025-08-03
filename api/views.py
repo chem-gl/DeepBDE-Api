@@ -5,21 +5,21 @@ from rest_framework.views import APIView
 from pydantic import ValidationError
 
 from api.controllers.predict_controller import (
-    predict_controller, predict_single_controller, predict_multiple_controller,
+     molecule_info_controller, molecule_smile_canonical_controller, predict_single_controller, predict_multiple_controller,
     fragment_controller, predict_check_controller, infer_all_controller,
     download_report_controller
 )
 
 from .model.dto import (
-    Atom2D, Bond2D, EvaluatedFragmentBond, PredictRequest, PredictSingleRequest, PredictMultipleRequest,
+    Atom2D, Bond2D, EvaluatedFragmentBond, MoleculeInfoRequest, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, PredictSingleRequest, PredictMultipleRequest,
     FragmentRequest, InferAllRequest, DownloadReportRequest, PredictCheckRequest,
-    PredictResponseData, PredictSingleResponseData, PredictMultipleResponseData,
+    MoleculeInfoResponseData, PredictSingleResponseData, PredictMultipleResponseData,
     FragmentResponseData, InferAllResponseData, DownloadReportResponseData, PredictCheckResponseData,
     ErrorDetail, ErrorCode, APIResponse, PredictedBond
 )
 
 # Define aliases for APIResponse with specific data types
-PredictResponse = APIResponse[PredictResponseData]
+PredictResponse = APIResponse[MoleculeInfoResponseData]
 PredictSingleResponse = APIResponse[PredictSingleResponseData]
 PredictMultipleResponse = APIResponse[PredictMultipleResponseData]
 FragmentResponse = APIResponse[FragmentResponseData]
@@ -38,13 +38,82 @@ def _handle_validation_error(e: ValidationError, status_code=400):
     payload = APIResponse[None](status="error", error=detail).model_dump()
     return Response(payload, status=status_code)
 
-class PredictView(APIView):
+
+
+class MoleculeSmileCanonicalView(APIView):
+    """
+    Endpoint para obtener el SMILES canónico de una molécula.
+    y su Id para el programa de predicción.
+    Endpoint to get the canonical SMILES of a molecule.
+    """
+    example1 = APIResponse[str](
+        status="success",
+        data="CCO"
+    ).model_dump()
+
+    @extend_schema(
+        description="""        
+        Devuelve el SMILES canónico de una molécula con hidrógenos explícitos.
+        Returns the canonical SMILES of a molecule with explicit hydrogens.
+        """,
+        request=MoleculeSmileCanonicalRequest,
+        responses={
+            200: OpenApiResponse(
+                response=PredictResponse,
+                description="Respuesta exitosa / Successful response",
+                examples=[
+                    OpenApiExample(
+                        name="Ejemplo exitoso",
+                        value=example1,
+                        response_only=True
+                    )
+                ]
+            ),
+            400: OpenApiResponse(
+                response=ErrorResponse,
+                description="Error de validación / Validation error",
+                examples=[
+                    OpenApiExample(
+                        name="Error por SMILES inválido",
+                        value={
+                            "status": "error",
+                            "detail": "Formato SMILES inválido"
+                        },
+                        response_only=True
+                    )
+                ]
+            )
+        },
+        examples=[
+            OpenApiExample(
+                "Ejemplo de entrada / Example input",
+                value={"smiles": "CCO"},
+                request_only=True
+            ),
+            OpenApiExample(
+                "Ejemplo alternativo / Alternative example",
+                value={"smiles": "C1=CC=CC=C1"},
+                request_only=True
+            )
+        ]
+    )
+    def post(self, request):
+        try:
+            req = MoleculeSmileCanonicalRequest(**request.data)
+            resp_data = molecule_smile_canonical_controller(req)
+            resp = APIResponse[MoleculeSmileCanonicalResponseData](status="success", data=resp_data)
+            return Response(resp.model_dump())
+        except ValidationError as e:
+            return _handle_validation_error(e)
+    
+
+class MoleculeInfoView(APIView):
     """
     Endpoint para obtener la imagen 2D de la molécula y la lista de enlaces con sus índices y átomos involucrados (sin predecir BDEs).
     """
-    example1 = APIResponse[PredictResponseData](
+    example1 = APIResponse[MoleculeInfoResponseData](
         status="success",
-        data=PredictResponseData(
+        data=MoleculeInfoResponseData(
             smiles_canonical="CCO",
             image_svg="<svg>...</svg>",
             canvas={"width": 300, "height": 300},
@@ -81,7 +150,7 @@ class PredictView(APIView):
         
         Returns enriched information about the molecule: canonical SMILES, SVG image, canvas metadata, atom and bond positions, unique ID.
         """,
-        request=PredictRequest,
+        request=MoleculeInfoRequest,
 
         responses={
             200: OpenApiResponse(
@@ -126,9 +195,9 @@ class PredictView(APIView):
     )
     def post(self, request):
         try:
-            req = PredictRequest(**request.data)
-            resp_data = predict_controller(req)
-            resp = APIResponse[PredictResponseData](status="success", data=resp_data)
+            req = MoleculeInfoRequest(**request.data)
+            resp_data = molecule_info_controller(req)
+            resp = APIResponse[MoleculeInfoResponseData](status="success", data=resp_data)
             return Response(resp.model_dump())
         except ValidationError as e:
             return _handle_validation_error(e)
@@ -396,6 +465,7 @@ class PredictCheckView(APIView):
                 bond_atoms="C-O",
                 bond_type="single"
             ),
+            are_same_products= True,
             products=["CC", "O"]
         )
     ).model_dump()
@@ -437,12 +507,17 @@ class PredictCheckView(APIView):
         examples=[
             OpenApiExample(
                 "Entrada de ejemplo / Example input",
-                value={"smiles": "CCO", "bond_idx": 1, "products": ["CC", "O"]},
+                value={"smiles": "CCO", "bond_idx": 1, 
+                       "molecule_id": "150018eccd174140",
+                       "products": ["CC", "O"] },
                 request_only=True
+                
             ),
             OpenApiExample(
                 "Entrada alternativa / Alternative input",
-                value={"smiles": "C1=CC=CC=C1", "bond_idx": 2, "products": ["C1=CC", "C=C1"]},
+                value={"smiles": "CCO", "bond_idx": 1,
+                       "molecule_id": "150018eccd174140",
+                       "products": ["[CH2][OH]", "[CH3]"]},
                 request_only=True
             )
         ]

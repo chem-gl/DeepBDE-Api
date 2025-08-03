@@ -1,3 +1,4 @@
+from typing import Literal, cast
 # Auxiliar para dibujar imagen principal
 def draw_main_image(pdf_canvas, svg_data):
     try:
@@ -90,7 +91,7 @@ from architecture import model
 from attr import dataclass
 import torch
 from api.model.dto import (
-    Atom2D, Bond2D, PredictRequest, PredictResponseData, PredictSingleRequest, PredictSingleResponseData,
+    Atom2D, Bond2D, MoleculeInfoRequest, MoleculeInfoResponseData, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, PredictSingleRequest, PredictSingleResponseData,
     PredictMultipleRequest, PredictMultipleResponseData, FragmentRequest, FragmentResponseData,
     PredictCheckRequest, PredictCheckResponseData, InferAllRequest, InferAllResponseData,
     DownloadReportRequest, DownloadReportResponseData, PredictedBond, EvaluatedFragmentBond
@@ -104,8 +105,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 from deepbde.architecture.inference_util import multi_predict, single_predict
 from io import BytesIO
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 import cairosvg
 
 @dataclass
@@ -167,7 +166,6 @@ def verify_smiles(smiles: str, mol_id: str) -> bool:
 
 def is_valid_for_bde(mol: MoleculeInfo, bond_idx: int) -> bool:
     """Checks if a bond at the given index is a single bond.
-    
     Args:
         mol (MoleculeInfo): The molecule information object.
         bond_idx (int): The index of the bond to check.
@@ -302,7 +300,7 @@ def get_all_info_molecule(smiles: str) -> MoleculeInfo:
         image_svg=image_svg
     )
     
-def predict_controller(request: PredictRequest) -> PredictResponseData:
+def molecule_info_controller(request: MoleculeInfoRequest) -> MoleculeInfoResponseData:
     """Controller for predicting the bond dissociation energy (BDE) of a molecule.
     Args:
         request (PredictRequest): Request object containing the SMILES string.
@@ -310,7 +308,7 @@ def predict_controller(request: PredictRequest) -> PredictResponseData:
         PredictResponseData: Response containing molecule data and SVG.
     """
     all_info = get_all_info_molecule(request.smiles)
-    return PredictResponseData(
+    return MoleculeInfoResponseData(
         smiles_canonical=all_info.smiles_canonical,
         image_svg=all_info.image_svg,
         canvas=all_info.canvas,
@@ -318,6 +316,8 @@ def predict_controller(request: PredictRequest) -> PredictResponseData:
         bonds=all_info.bonds,
         molecule_id=all_info.molecule_id
     )
+
+molecule_info_controller
 
 
 def get_bde_for_bond_indices(mol_info: MoleculeInfo, idx: int ) -> float | None:
@@ -531,22 +531,76 @@ def download_report_controller(request: DownloadReportRequest) -> DownloadReport
     )
 
 def predict_check_controller(request: PredictCheckRequest) -> PredictCheckResponseData: #ignore
-    # Esta función aún no está implementada. Se debe completar según los requisitos del proyecto.
-    dummy_bond = PredictedBond(
-        idx=0,
-        bde=0.0,
-        begin_atom_idx=0,
-        end_atom_idx=1,
-        bond_atoms="H-H",
-        bond_type="single"
+    all_info = get_all_info_molecule(request.smiles)
+    if not verify_smiles(all_info.smiles_canonical, request.molecule_id):
+        raise ValueError(f"SMILES ID mismatch: expected {all_info.molecule_id}, got {request.molecule_id}")
+    if( not is_valid_for_bde(all_info.mol, request.bond_idx)):
+        raise ValueError(f"Bond index {request.bond_idx} is not a single bond or is in a ring.")
+    
+    mol = all_info.mol
+    bond_idx = request.bond_idx
+    # Get bond and atom info
+    bond = mol.GetBondWithIdx(bond_idx)
+    begin_idx = bond.GetBeginAtomIdx()
+    end_idx = bond.GetEndAtomIdx()
+    atom1 = mol.GetAtomWithIdx(begin_idx)
+    atom2 = mol.GetAtomWithIdx(end_idx)
+    bde = get_bde_for_bond_indices(all_info, bond_idx)
+    # Build PredictedBond
+    predicted_bond = PredictedBond(
+        idx=bond_idx,
+        bde=bde,
+        begin_atom_idx=begin_idx,
+        end_atom_idx=end_idx,
+        bond_atoms=f"{atom1.GetSymbol()}-{atom2.GetSymbol()}",
+        bond_type=bond.GetBondType().name.lower()
     )
+    # Get generated products (fragments)
+    products = get_fragments_from_bond(mol, bond_idx)
+    
+    # Canonicalize generated products
+    products_canonical = [Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True) for s in products if Chem.MolFromSmiles(s) is not None]
+    # Canonicalize input products
+    input_products_canonical = [Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True) for s in request.products if Chem.MolFromSmiles(s) is not None]
+    
+    # If BDE is None or no products, return incompatible bond
+    if bde is None or not products_canonical:
+        return PredictCheckResponseData(
+            smiles_canonical=all_info.smiles_canonical,
+            bond=predicted_bond,
+            are_same_products=False,
+            products=["incompatible bond"]
+        )
+    
+    # Check if input products match generated products (order-insensitive)
+    are_same_products = set(products_canonical) == set(input_products_canonical)
     return PredictCheckResponseData(
-        smiles_canonical="",
-        bond=dummy_bond,
-        products=[]
+        smiles_canonical=all_info.smiles_canonical,
+        bond=predicted_bond,
+        are_same_products=are_same_products,
+        products=products_canonical
     )
 
-def fragment_controller(fragment_request: FragmentRequest) -> FragmentResponseData:
+
+def molecule_smile_canonical_controller(smiles: MoleculeSmileCanonicalRequest) -> MoleculeSmileCanonicalResponseData:
+    """Generates the canonical SMILES for a given molecule.
+    
+    Args:
+        smiles (MoleculeSmileCanonicalRequest): Request object containing the SMILES string.
+    Returns:
+        MoleculeSmileCanonicalResponseData: Response containing the canonical SMILES.
+    """
+    try:
+        _, mol_id, smiles_canonical = generate_id_smiles(smiles.smiles)
+        return MoleculeSmileCanonicalResponseData(
+            smiles=smiles.smiles,
+            smiles_canonical=smiles_canonical,
+            molecule_id=mol_id
+        )
+    except ValueError as e:
+        raise ValueError(f"Invalid SMILES: {e}") from e
+
+def fragment_controller(_: FragmentRequest) -> FragmentResponseData:
     # Esta función aún no está implementada. Se debe completar según los requisitos del proyecto.
     return FragmentResponseData(
         smiles_canonical="",

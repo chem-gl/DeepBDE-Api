@@ -98,14 +98,14 @@ class APIResponse(BaseModel, Generic[T]):
 # ---------- Modelos de endpoints ----------
 
 # --- /predict/ ---
-class PredictRequest(BaseModel):
+class MoleculeInfoRequest(BaseModel):
     """
     Entrada para /predict/.
     - smiles: SMILES de la molécula
     """
     smiles: str
 
-class PredictResponseData(BaseModel):
+class MoleculeInfoResponseData(BaseModel):
     """
     Salida de /predict/.
     - smiles_canonical: SMILES canónico con hidrógenos explícitos
@@ -183,7 +183,7 @@ class PredictMultipleResponseData(BaseModel):
 class FragmentRequest(BaseModel):
     """
     Entrada para /fragment/.
-    - smiles: SMILES con hidrógenos explícitos
+    - smiles: SMILES
     - molecule_id: ID de la molécula
     - bond_idx: Índice del enlace (opcional)
     - export_smiles: Si True, devuelve lista de SMILES
@@ -194,7 +194,6 @@ class FragmentRequest(BaseModel):
     bond_idx: Optional[int] = None
     export_smiles: bool = False
     export_xyz: bool = False
-
     @model_validator(mode='before')
     @classmethod
     def _validate_export_options(cls, data: Any) -> Any:
@@ -226,6 +225,7 @@ class PredictCheckRequest(BaseModel):
     - products: Lista de SMILES esperados
     """
     smiles: str
+    molecule_id: str
     bond_idx: int
     products: List[str] = Field(...)
 
@@ -238,7 +238,27 @@ class PredictCheckResponseData(BaseModel):
     """
     smiles_canonical: str
     bond: PredictedBond
+    are_same_products: bool = False
+
     products: List[str]
+
+# --- /predict/info-smile-canonical/ ---
+class MoleculeSmileCanonicalRequest(BaseModel):
+    """
+    Salida de /predict/info-smile-canonical/.
+    - smiles: smile 
+    """
+    smiles: str
+class MoleculeSmileCanonicalResponseData(BaseModel):
+    """
+    Salida de /predict/info-smile-canonical/.
+    - smiles_canonical: SMILES canónico con hidrógenos explícitos
+    - molecule_id: ID único (hash SHA256)
+    """
+    smiles: str
+    smiles_canonical: str
+    molecule_id: str
+
 
 # --- /infer/all/ ---
 class InferAllRequest(BaseModel):

@@ -1,11 +1,12 @@
 from django.urls import path
 from .views import (
-    PredictView, PredictSingleView, PredictMultipleView,
+    MoleculeInfoView, MoleculeSmileCanonicalView, PredictSingleView, PredictMultipleView,
     FragmentView, PredictCheckView, InferAllView, DownloadReportView
 )
 
 urlpatterns = [
-    path('predict/', PredictView.as_view(), name='predict'),
+    path('predict/info/', MoleculeInfoView.as_view(), name='predict'),
+    path('predict/info-smile-canonical/', MoleculeSmileCanonicalView.as_view(), name='predict_smile_canonical'),
     path('predict/single/', PredictSingleView.as_view(), name='predict_single'),
     path('predict/multiple/', PredictMultipleView.as_view(), name='predict_multiple'),
     path('fragment/', FragmentView.as_view(), name='fragment'),
