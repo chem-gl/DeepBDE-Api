@@ -9,7 +9,7 @@ from api.controllers.predict_controller import (
     download_report_controller
 )
 from .model.dto import (
-    Atom2D, Bond2D, EvaluatedFragmentBond, MoleculeInfoRequest, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, PredictSingleRequest, PredictMultipleRequest,
+    Atom2D, BDEValues, Bond2D, EvaluatedFragmentBond, MoleculeInfoRequest, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, PredictSingleRequest, PredictMultipleRequest,
     FragmentRequest, InferAllRequest, DownloadReportRequest, PredictCheckRequest,
     MoleculeInfoResponseData, PredictSingleResponseData, PredictMultipleResponseData,
     FragmentResponseData, InferAllResponseData, DownloadReportResponseData, PredictCheckResponseData,
@@ -360,7 +360,10 @@ class FragmentView(APIView):
         data=FragmentResponseData(
             smiles_canonical="CCO",
             molecule_id="a1b2c3d4e5f6a7b8",
-            bde_s=[(1, 100.0)],  # Provide a value, e.g., None or a float if available
+            bde_values=[
+                BDEValues(idx=1, bde=95.0),
+                BDEValues(idx=2, bde=100.0)
+            ],
             bonds=[
                 EvaluatedFragmentBond(
                     idx=1,

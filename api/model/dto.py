@@ -183,17 +183,26 @@ class FragmentRequest(BaseModel):
         if not data.get('export_smiles') and not data.get('export_xyz'):
             raise ValueError("Debe seleccionarse al menos export_smiles o export_xyz")
         return data
+    
+class BDEValues(BaseModel):
+    """
+    Representa los valores de BDE para un enlace.
+    - idx: Índice del enlace
+    - bde: Valor de BDE
+    """
+    idx: int
+    bde: float | None  # Puede ser None si no se pudo calcular el BDE
 class FragmentResponseData(BaseModel):
     """
     Salida de /fragment/.
-    - bde_s: Lista de tuplas (índice del enlace, BDE)
+    - bde_values: Lista de objetos bde_values
     - smiles_canonical: SMILES canónico
     - molecule_id: ID de la molécula
     - bonds: Lista de enlaces evaluados
     - smiles_list: Lista de SMILES (opcional)
     - xyz_block: Cadena XYZ (opcional)
     """
-    bde_s: List[tuple[int, float]] = Field(..., description="Lista de tuplas (índice del enlace, BDE)")
+    bde_values: List[BDEValues] = Field(..., description="Lista de objetos BDEValues")
     smiles_canonical: str
     molecule_id: str
     bonds: List[EvaluatedFragmentBond]

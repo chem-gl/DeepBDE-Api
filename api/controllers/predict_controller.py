@@ -8,7 +8,7 @@ from attr import dataclass
 from rpds import List
 import torch
 from api.model.dto import (
-    Atom2D, Bond2D, MoleculeInfoRequest, MoleculeInfoResponseData, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, PredictSingleRequest, PredictSingleResponseData,
+    Atom2D, BDEValues, Bond2D, MoleculeInfoRequest, MoleculeInfoResponseData, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, PredictSingleRequest, PredictSingleResponseData,
     PredictMultipleRequest, PredictMultipleResponseData, FragmentRequest, FragmentResponseData,
     PredictCheckRequest, PredictCheckResponseData, InferAllRequest, InferAllResponseData,
     DownloadReportRequest, DownloadReportResponseData, PredictedBond, EvaluatedFragmentBond
@@ -632,11 +632,10 @@ def fragment_controller(request: FragmentRequest) -> FragmentResponseData:
     bonds = [process_bond(idx, all_info, request, smiles_list, xyz_blocks) for idx in bond_indices]
     xyz_block = "\n".join(xyz_blocks) if xyz_blocks is not None else None
     #lleno bde_s que tendra los bde de los enlaces solicitados
-    bde_s: list[tuple[int, float]] = []
+    bde_s: list[BDEValues] = []
     for idx in bond_indices:
         bde = get_bde_for_bond_indices(all_info, idx)
-        if bde is not None:
-            bde_s.append((idx, bde))
+        bde_s.append(BDEValues(idx=idx, bde=bde))
     
     
     return FragmentResponseData(
@@ -645,5 +644,5 @@ def fragment_controller(request: FragmentRequest) -> FragmentResponseData:
         bonds=bonds,
         smiles_list=smiles_list,
         xyz_block=xyz_block,
-        bde_s=bde_s
+        bde_values=bde_s
     )
