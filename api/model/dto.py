@@ -264,7 +264,7 @@ class DownloadReportRequest(BaseModel):
     """
     Entrada para /download_report/.
     - smiles: SMILES de la molécula
-    - format: 'pdf' o 'html'
+    - format: 'pdf' o 'txt'
     """
     smiles: str
     format: str
@@ -272,7 +272,7 @@ class DownloadReportRequest(BaseModel):
     @field_validator('format')
     @classmethod
     def _validate_format(cls, v: str) -> str:
-        if v not in {"pdf", "html"}:
+        if v not in {"pdf", "txt"}:
             raise ValueError("Formato no soportado: use 'pdf' o 'html'.")
         return v
 
@@ -281,4 +281,5 @@ class DownloadReportResponseData(BaseModel):
     Salida de /download_report/.
     - report_base64: Reporte en base64
     """
+    type: Literal["pdf", "txt"] = "pdf"
     report_base64: str

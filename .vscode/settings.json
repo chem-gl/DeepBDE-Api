@@ -1,5 +1,6 @@
 {
   "cSpell.words": ["deepbde", "healthcheck", "latexmk", "redis"],
 
-  "python.analysis.typeCheckingMode": "standard"
+  "python.analysis.typeCheckingMode": "standard",
+  "gitConfigUser.selectedProfile": "Cesar"
 }

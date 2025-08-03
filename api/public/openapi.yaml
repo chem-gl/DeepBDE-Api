@@ -957,7 +957,7 @@ components:
       description: |-
         Entrada para /download_report/.
         - smiles: SMILES de la molécula
-        - format: 'pdf' o 'html'
+        - format: 'pdf' o 'txt'
       properties:
         smiles:
           title: Smiles
@@ -1170,7 +1170,6 @@ components:
         products:
           items:
             type: string
-          minItems: 1
           title: Products
           type: array
       required:

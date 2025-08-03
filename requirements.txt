@@ -1,4 +1,3 @@
-# requirements.txt recomendado para DeepBDE Backend
 Django>=4.2
 djangorestframework
 rdkit
@@ -13,3 +12,5 @@ PyJWT
 fpdf2
 drf-spectacular
 networkx==2.8.8
+reportlab
+cairosvg

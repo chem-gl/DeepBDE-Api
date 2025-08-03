@@ -11,11 +11,11 @@ from api.controllers.predict_controller import (
 )
 
 from .model.dto import (
-    PredictRequest, PredictSingleRequest, PredictMultipleRequest,
+    Atom2D, Bond2D, EvaluatedFragmentBond, PredictRequest, PredictSingleRequest, PredictMultipleRequest,
     FragmentRequest, InferAllRequest, DownloadReportRequest, PredictCheckRequest,
     PredictResponseData, PredictSingleResponseData, PredictMultipleResponseData,
     FragmentResponseData, InferAllResponseData, DownloadReportResponseData, PredictCheckResponseData,
-    ErrorDetail, ErrorCode, APIResponse
+    ErrorDetail, ErrorCode, APIResponse, PredictedBond
 )
 
 # Define aliases for APIResponse with specific data types
@@ -49,27 +49,27 @@ class PredictView(APIView):
             image_svg="<svg>...</svg>",
             canvas={"width": 300, "height": 300},
             atoms={
-                "0": {"x": 50.0, "y": 100.0, "symbol": "C", "smiles": "[CH3]"},
-                "1": {"x": 150.0, "y": 100.0, "symbol": "C", "smiles": "[CH2]"},
-                "2": {"x": 250.0, "y": 100.0, "symbol": "O", "smiles": "O"}
+                "0": Atom2D(x=50.0, y=100.0, symbol="C", smiles="[CH3]"),
+                "1": Atom2D(x=150.0, y=100.0, symbol="C", smiles="[CH2]"),
+                "2": Atom2D(x=250.0, y=100.0, symbol="O", smiles="O")
             },
             bonds={
-                "0": {
-                    "start": 0,
-                    "end": 1,
-                    "start_coords": {"x": 50.0, "y": 100.0},
-                    "end_coords": {"x": 150.0, "y": 100.0},
-                    "bond_atoms": "C-C",
-                    "bond_type": "single"
-                },
-                "1": {
-                    "start": 1,
-                    "end": 2,
-                    "start_coords": {"x": 150.0, "y": 100.0},
-                    "end_coords": {"x": 250.0, "y": 100.0},
-                    "bond_atoms": "C-O",
-                    "bond_type": "single"
-                }
+                "0": Bond2D(
+                    start=0,
+                    end=1,
+                    start_coords={"x": 50.0, "y": 100.0},
+                    end_coords={"x": 150.0, "y": 100.0},
+                    bond_atoms="C-C",
+                    bond_type="single"
+                ),
+                "1": Bond2D(
+                    start=1,
+                    end=2,
+                    start_coords={"x": 150.0, "y": 100.0},
+                    end_coords={"x": 250.0, "y": 100.0},
+                    bond_atoms="C-O",
+                    bond_type="single"
+                )
             },
             molecule_id="a1b2c3d4e5f6a7b8"
         )
@@ -141,14 +141,14 @@ class PredictSingleView(APIView):
         status="success",
         data=PredictSingleResponseData(
             smiles_canonical="CCO",
-            bond={
-                "idx": 1,
-                "bde": 95.0,
-                "begin_atom_idx": 0,
-                "end_atom_idx": 1,
-                "bond_atoms": "C-O",
-                "bond_type": "single"
-            }
+            bond=PredictedBond(
+                idx=1,
+                bde=95.0,
+                begin_atom_idx=0,
+                end_atom_idx=1,
+                bond_atoms="C-O",
+                bond_type="single"
+            )
         )
     ).model_dump()
 
@@ -218,22 +218,22 @@ class PredictMultipleView(APIView):
             smiles="CCO",
             molecule_id="a1b2c3d4e5f6a7b8",
             bonds=[
-                {
-                    "idx": 1,
-                    "bde": 95.0,
-                    "begin_atom_idx": 0,
-                    "end_atom_idx": 1,
-                    "bond_atoms": "C-O",
-                    "bond_type": "single"
-                },
-                {
-                    "idx": 2,
-                    "bde": 100.0,
-                    "begin_atom_idx": 1,
-                    "end_atom_idx": 2,
-                    "bond_atoms": "C-C",
-                    "bond_type": "single"
-                }
+                PredictedBond(
+                    idx=1,
+                    bde=95.0,
+                    begin_atom_idx=0,
+                    end_atom_idx=1,
+                    bond_atoms="C-O",
+                    bond_type="single"
+                ),
+                PredictedBond(
+                    idx=2,
+                    bde=100.0,
+                    begin_atom_idx=1,
+                    end_atom_idx=2,
+                    bond_atoms="C-C",
+                    bond_type="single"
+                )
             ]
         )
     ).model_dump()
@@ -310,14 +310,14 @@ class FragmentView(APIView):
             smiles_canonical="CCO",
             molecule_id="a1b2c3d4e5f6a7b8",
             bonds=[
-                {
-                    "idx": 1,
-                    "begin_atom": 0,
-                    "end_atom": 1,
-                    "bond_atoms": "C-O",
-                    "is_fragmentable": True,
-                    "bond_type": "single"
-                }
+                EvaluatedFragmentBond(
+                    idx=1,
+                    begin_atom=0,
+                    end_atom=1,
+                    bond_atoms="C-O",
+                    is_fragmentable=True,
+                    bond_type="single"
+                )
             ],
             smiles_list=["CC", "O"],
             xyz_block=None
@@ -388,14 +388,14 @@ class PredictCheckView(APIView):
         status="success",
         data=PredictCheckResponseData(
             smiles_canonical="CCO",
-            bond={
-                "idx": 1,
-                "bde": 95.0,
-                "begin_atom_idx": 0,
-                "end_atom_idx": 1,
-                "bond_atoms": "C-O",
-                "bond_type": "single"
-            },
+            bond=PredictedBond(
+                idx=1,
+                bde=95.0,
+                begin_atom_idx=0,
+                end_atom_idx=1,
+                bond_atoms="C-O",
+                bond_type="single"
+            ),
             products=["CC", "O"]
         )
     ).model_dump()
@@ -466,22 +466,22 @@ class InferAllView(APIView):
             smiles_canonical="CCO",
             molecule_id="a1b2c3d4e5f6a7b8",
             bonds=[
-                {
-                    "idx": 1,
-                    "bde": 95.0,
-                    "begin_atom_idx": 0,
-                    "end_atom_idx": 1,
-                    "bond_atoms": "C-O",
-                    "bond_type": "single"
-                },
-                {
-                    "idx": 2,
-                    "bde": 100.0,
-                    "begin_atom_idx": 1,
-                    "end_atom_idx": 2,
-                    "bond_atoms": "C-C",
-                    "bond_type": "single"
-                }
+                PredictedBond(
+                    idx=1,
+                    bde=95.0,
+                    begin_atom_idx=0,
+                    end_atom_idx=1,
+                    bond_atoms="C-O",
+                    bond_type="single"
+                ),
+                PredictedBond(
+                    idx=2,
+                    bde=100.0,
+                    begin_atom_idx=1,
+                    end_atom_idx=2,
+                    bond_atoms="C-C",
+                    bond_type="single"
+                )
             ]
         )
     ).model_dump()
