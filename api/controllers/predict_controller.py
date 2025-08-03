@@ -1,3 +1,4 @@
+import base64
 from typing import Dict, Tuple
 from architecture import model
 from attr import dataclass
@@ -391,7 +392,6 @@ def get_fragments_from_bond(mol: Chem.Mol, bond_idx: int) -> list[str]:
 
 def  report_txt(smile:str) -> str:
     """Generates a report in text format for the molecule.
-    
     Args:
         smile (str): The SMILES representation of the molecule.
     Returns:
@@ -401,8 +401,8 @@ def  report_txt(smile:str) -> str:
     # y que enlaces se selecciono y que moleculas da como resultado al romper el enlace.
     all_info = get_all_info_molecule(smile)
     report_lines = [
-        f"Molecule ID: {all_info.molecule_id}",
-        f"Canonical SMILES: {all_info.smiles_canonical}",
+        f"SMILES introduced: {smile}",
+        f"Canonical SMILES with Hs: {all_info.smiles_canonical}",
         "Bonds and BDEs:"
     ]
     for bond in all_info.mol.GetBonds():
@@ -430,91 +430,151 @@ def  report_txt(smile:str) -> str:
     return report_lines
 
 
-def report_pdf(smile:str) -> str:
+def _draw_fragment_images(pdf_canvas, fragments, all_info, bond_idx, bde, text_y, canvas_size):
+    """Helper to draw fragment images and info to the PDF canvas.
+    
+    Args:
+        pdf_canvas: The reportlab canvas object.
+        fragments: List of SMILES strings for the fragments.
+        all_info: MoleculeInfo object containing molecule data.
+        bond_idx: Index of the bond being fragmented.
+        bde: Bond dissociation energy value.
+        text_y: Current y-coordinate for drawing text and images.
+        canvas_size: Dictionary with canvas width and height.
+    
+    Returns:
+        float: Updated y-coordinate after drawing.
+    """
+    try:
+        # Add a horizontal line to separate sections
+        pdf_canvas.line(50, text_y, 550, text_y)
+        text_y -= 10
+
+        # Add BDE information
+        pdf_canvas.drawString(50, text_y, f"Bond {bond_idx} (BDE: {bde if bde is not None else 'N/A'}):")
+        text_y -= 15
+
+        # Generate and add images for each fragment
+        for i, fragment_smiles in enumerate(fragments):
+            try:
+                fragment_mol = Chem.MolFromSmiles(fragment_smiles)
+                if fragment_mol is None:
+                    raise ValueError(f"Invalid fragment SMILES: {fragment_smiles}")
+                
+                fragment_svg, _ = generate_molecule_svg(fragment_mol, canvas_size)
+                if not fragment_svg.strip().startswith("<svg"):
+                    raise ValueError(f"Invalid SVG content for fragment {i} of bond {bond_idx}")
+
+                fragment_png_buffer = BytesIO()
+                try:
+                    cairosvg.svg2png(bytestring=fragment_svg.encode("utf-8"), write_to=fragment_png_buffer, output_width=200, output_height=200)
+                    fragment_png_buffer.seek(0)
+                    # Position fragment images side by side
+                    x_position = 50 + (i * 250)
+                    pdf_canvas.drawImage(fragment_png_buffer, x_position, text_y - 200, width=200, height=200)
+                finally:
+                    fragment_png_buffer.close()
+                    
+            except Exception as e:
+                logger.error("Error processing fragment %d for bond %d: %s", i, bond_idx, e)
+                pdf_canvas.drawString(50, text_y - 20, f"Error generating fragment image {i} for bond {bond_idx}")
+                text_y -= 30
+
+        # Adjust text_y for the next section
+        text_y -= 220
+        return text_y
+
+    except Exception as e:
+        logger.error("Error in _draw_fragment_images for bond %d: %s", bond_idx, e)
+        pdf_canvas.drawString(50, text_y, f"Error processing fragments for bond {bond_idx}")
+        return text_y - 30
+
+def report_pdf(smile: str) -> str:
     """Generates a report in PDF format for the molecule.
     
     Args:
         smile (str): The SMILES representation of the molecule.
+    
     Returns:
         str: Base64-encoded PDF report of the molecule.
     """
-    all_info = get_all_info_molecule(smile)
+    try:
+        all_info = get_all_info_molecule(smile)
+        if all_info is None or all_info.mol is None:
+            raise ValueError("Failed to generate molecule information from SMILES")
 
-    # Create a buffer to store the PDF
-    buffer = BytesIO()
-    pdf_canvas = canvas.Canvas(buffer, pagesize=letter)
+        # Initialize PDF canvas
+        buffer = BytesIO()
+        pdf_canvas = canvas.Canvas(buffer, pagesize=letter)
+        pdf_canvas.setFont("Helvetica", 10)
 
-    # Convert the SVG to PNG using cairosvg
-    svg_data = all_info.image_svg
-    png_buffer = BytesIO()
-    cairosvg.svg2png(bytestring=svg_data.encode("utf-8"), write_to=png_buffer)
-    png_buffer.seek(0)
+        # Draw the main molecule image
+        try:
+            svg_data = all_info.image_svg
+            if not svg_data.strip().startswith("<svg"):
+                raise ValueError("Invalid SVG content for main molecule")
 
-    # Add the PNG image of the main molecule to the PDF
-    pdf_canvas.drawImage(png_buffer, 50, 700, width=200, height=200)  # Position the PNG image
+            png_buffer = BytesIO()
+            try:
+                cairosvg.svg2png(bytestring=svg_data.encode("utf-8"), write_to=png_buffer, output_width=200, output_height=200)
+                png_buffer.seek(0)
+                pdf_canvas.drawImage(png_buffer, 50, 700, width=200, height=200)
+            finally:
+                png_buffer.close()
+        except Exception as e:
+            logger.error("Error processing SVG for molecule: %s", e)
+            pdf_canvas.drawString(50, 700, "Error generating molecule image")
 
-    # Add the molecule data next to the image
-    text_x = 300  # Position for the text
-    text_y = 800
-    pdf_canvas.setFont("Helvetica", 10)
-    pdf_canvas.drawString(text_x, text_y, f"Molecule ID: {all_info.molecule_id}")
-    text_y -= 15
-    pdf_canvas.drawString(text_x, text_y, f"Canonical SMILES: {all_info.smiles_canonical}")
-    text_y -= 15
-    pdf_canvas.drawString(text_x, text_y, "Bonds and BDEs:")
-    text_y -= 15
-
-    for bond in all_info.mol.GetBonds():
-        bond_idx = bond.GetIdx()
-        begin_idx = bond.GetBeginAtomIdx()
-        end_idx = bond.GetEndAtomIdx()
-        atom1 = all_info.mol.GetAtomWithIdx(begin_idx)
-        atom2 = all_info.mol.GetAtomWithIdx(end_idx)
-        bde = get_bde_for_bond_indices(all_info, bond_idx)
-        pdf_canvas.drawString(
-            text_x, text_y, f"Bond {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()} (BDE: {bde})"
-        )
+        # Add molecule data
+        text_x = 300
+        text_y = 800
+        pdf_canvas.drawString(text_x, text_y, f"SMILES introduced: {smile}")
+        text_y -= 15
+        pdf_canvas.drawString(text_x, text_y, f"Canonical SMILES with Hs: {all_info.smiles_canonical}")
+        text_y -= 15
+        pdf_canvas.drawString(text_x, text_y, "Bonds and BDEs:")
         text_y -= 15
 
-    pdf_canvas.drawString(50, text_y, "Fragmentation Results:")
-    text_y -= 15
-
-    for bond in all_info.mol.GetBonds():
-        bond_idx = bond.GetIdx()
-        bde = get_bde_for_bond_indices(all_info, bond_idx)
-        if bde is not None:
-            fragments = get_fragments_from_bond(all_info.mol, bond_idx)
-
-            # Add a horizontal line to separate sections
-            pdf_canvas.line(50, text_y, 550, text_y)
-            text_y -= 10
-
-            # Add BDE information
-            pdf_canvas.drawString(50, text_y, f"Bond {bond_idx} (BDE: {bde}):")
+        # List bonds and their BDEs
+        for bond in all_info.mol.GetBonds():
+            bond_idx = bond.GetIdx()
+            begin_idx = bond.GetBeginAtomIdx()
+            end_idx = bond.GetEndAtomIdx()
+            atom1 = all_info.mol.GetAtomWithIdx(begin_idx)
+            atom2 = all_info.mol.GetAtomWithIdx(end_idx)
+            bde = get_bde_for_bond_indices(all_info, bond_idx)
+            bde_text = f"{bde:.2f}" if bde is not None else "N/A"
+            pdf_canvas.drawString(
+                text_x, text_y, f"Bond {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()} (BDE: {bde_text})"
+            )
             text_y -= 15
 
-            # Generate and add images for each fragment
-            for i, fragment_smiles in enumerate(fragments):
-                fragment_mol = Chem.MolFromSmiles(fragment_smiles)
-                fragment_svg, _ = generate_molecule_svg(fragment_mol, all_info.canvas)
-                fragment_png_buffer = BytesIO()
-                cairosvg.svg2png(bytestring=fragment_svg.encode("utf-8"), write_to=fragment_png_buffer)
-                fragment_png_buffer.seek(0)
+        # Add fragmentation results
+        pdf_canvas.drawString(50, text_y, "Fragmentation Results:")
+        text_y -= 15
 
-                # Position fragment images below the BDE info
-                pdf_canvas.drawImage(fragment_png_buffer, 50 + (i * 250), text_y - 200, width=200, height=200)
+        for bond in all_info.mol.GetBonds():
+            bond_idx = bond.GetIdx()
+            bde = get_bde_for_bond_indices(all_info, bond_idx)
+            if bde is not None:
+                fragments = get_fragments_from_bond(all_info.mol, bond_idx)
+                if len(fragments) == 2:  # Ensure valid fragmentation
+                    text_y = _draw_fragment_images(pdf_canvas, fragments, all_info, bond_idx, bde, text_y, all_info.canvas)
+                else:
+                    pdf_canvas.drawString(50, text_y, f"Invalid fragments for bond {bond_idx}")
+                    text_y -= 30
 
-            # Adjust text_y for the next section
-            text_y -= 220
+        # Finalize the PDF
+        pdf_canvas.save()
+        pdf_content = buffer.getvalue()
+        buffer.close()
 
-    # Finalize the PDF
-    pdf_canvas.save()
-    buffer.seek(0)
+        # Encode the PDF content to base64
+        return base64.b64encode(pdf_content).decode("utf-8")
 
-    # Return the PDF as a base64-encoded string
-    pdf_content = buffer.read()
-    buffer.close()
-    return pdf_content.decode("latin1")
+    except Exception as e:
+        logger.error("Error generating PDF report: %s", e)
+        raise ValueError(f"Failed to generate PDF report: {str(e)}")
 
 
 def download_report_controller(request: DownloadReportRequest) -> DownloadReportResponseData:
@@ -538,11 +598,6 @@ def download_report_controller(request: DownloadReportRequest) -> DownloadReport
         type="pdf" if request.format == "pdf" else "txt",
         report_base64=report_base64
     )
-    
-    
-    
-    
-    
     
 def predict_check_controller(request: PredictCheckRequest) -> PredictCheckResponseData:
     # Esta función aún no está implementada. Se debe completar según los requisitos del proyecto.
