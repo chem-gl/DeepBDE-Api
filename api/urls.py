@@ -3,7 +3,6 @@ from .views import (
     MoleculeInfoView, MoleculeSmileCanonicalView, PredictSingleView, PredictMultipleView,
     FragmentView, PredictCheckView, InferAllView, DownloadReportView
 )
-
 urlpatterns = [
     path('predict/info/', MoleculeInfoView.as_view(), name='predict'),
     path('predict/info-smile-canonical/', MoleculeSmileCanonicalView.as_view(), name='predict_smile_canonical'),

@@ -1,7 +1,6 @@
 from typing import List, Optional, Dict, Any, Literal, TypeVar, Generic
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator, ValidationError
-
 # ---------- Enumeración de códigos de error ----------
 class ErrorCode(str, Enum):
     """Enumeración de códigos de error estándar de la API."""
@@ -9,7 +8,6 @@ class ErrorCode(str, Enum):
     BOND_INDEX_OUT_OF_RANGE = "BOND_INDEX_OUT_OF_RANGE"
     UNSUPPORTED_FORMAT = "UNSUPPORTED_FORMAT"
     MISSING_EXPORT_OPTION = "MISSING_EXPORT_OPTION"
-
 # ---------- Clases comunes ----------
 class ErrorDetail(BaseModel):
     """
@@ -19,7 +17,6 @@ class ErrorDetail(BaseModel):
     """
     code: ErrorCode  # Código de error único, basado en la enumeración ErrorCode.
     message: str  # Descripción amigable del error.
-
 class PredictedBond(BaseModel):
     """
     Detalle de un enlace químico y su BDE predicha.
@@ -35,8 +32,6 @@ class PredictedBond(BaseModel):
     end_atom_idx: int  # Índice del átomo final del enlace.
     bond_atoms: str  # Representación legible del enlace (ejemplo: 'C-O').
     bond_type: Literal["single", "double", "triple", "aromatic"] = "single" 
-
-
 class EvaluatedFragmentBond(BaseModel):
     """
     Representa un enlace evaluado para fragmentación.
@@ -52,7 +47,6 @@ class EvaluatedFragmentBond(BaseModel):
     bond_atoms: str  # Representación legible del enlace (ejemplo: 'C-H').
     bond_type: Literal["single", "double", "triple", "aromatic"] = "single"
     is_fragmentable: bool  # Indica si el enlace puede fragmentarse (enlace simple, etc.).
-
 class Atom2D(BaseModel):
     """
     Información 2D de un átomo para visualización y metadatos.
@@ -65,7 +59,6 @@ class Atom2D(BaseModel):
     y: float
     symbol: str
     smiles: Optional[str] = None
-
 class Bond2D(BaseModel):
     """
     Información 2D de un enlace para visualización y metadatos.
@@ -83,7 +76,6 @@ class Bond2D(BaseModel):
     bond_type: Literal["single", "double", "triple", "aromatic"] = "single" 
 # ---------- Plantilla de respuesta API ----------
 T = TypeVar('T')
-
 class APIResponse(BaseModel, Generic[T]):
     """
     Respuesta unificada para todos los endpoints.
@@ -94,9 +86,7 @@ class APIResponse(BaseModel, Generic[T]):
     status: Literal["success", "error"] = "success"
     data: Optional[T] = None
     error: Optional[ErrorDetail] = None
-
 # ---------- Modelos de endpoints ----------
-
 # --- /predict/ ---
 class MoleculeInfoRequest(BaseModel):
     """
@@ -104,7 +94,6 @@ class MoleculeInfoRequest(BaseModel):
     - smiles: SMILES de la molécula
     """
     smiles: str
-
 class MoleculeInfoResponseData(BaseModel):
     """
     Salida de /predict/.
@@ -121,7 +110,6 @@ class MoleculeInfoResponseData(BaseModel):
     atoms: Dict[str, Atom2D]
     bonds: Dict[str, Bond2D]
     molecule_id: str
-
 # --- /predict/single/ ---
 class PredictSingleRequest(BaseModel):
     """
@@ -139,7 +127,6 @@ class PredictSingleRequest(BaseModel):
         if value < 0:
             raise ValueError("El índice del enlace debe ser mayor o igual a 0")
         return value
-
 class PredictSingleResponseData(BaseModel):
     """
     Salida de /predict/single/.
@@ -148,7 +135,6 @@ class PredictSingleResponseData(BaseModel):
     """
     smiles_canonical: str
     bond: PredictedBond
-
 # --- /predict/multiple/ ---
 class PredictMultipleRequest(BaseModel):
     """
@@ -160,14 +146,12 @@ class PredictMultipleRequest(BaseModel):
     smiles: str
     bond_indices: list[int]
     molecule_id: str
-
     @field_validator('bond_indices', mode='before')
     @classmethod
     def validate_bond_indices(cls, value):
         if not all(idx >= 0 for idx in value):
             raise ValueError("Todos los índices de enlace deben ser mayores o iguales a 0")
         return value
-
 class PredictMultipleResponseData(BaseModel):
     """
     Salida de /predict/multiple/.
@@ -178,7 +162,6 @@ class PredictMultipleResponseData(BaseModel):
     smiles: str
     molecule_id: str
     bonds: List[PredictedBond]
-
 # --- /fragment/ ---
 class FragmentRequest(BaseModel):
     """
@@ -200,7 +183,6 @@ class FragmentRequest(BaseModel):
         if not data.get('export_smiles') and not data.get('export_xyz'):
             raise ValueError("Debe seleccionarse al menos export_smiles o export_xyz")
         return data
-
 class FragmentResponseData(BaseModel):
     """
     Salida de /fragment/.
@@ -215,7 +197,6 @@ class FragmentResponseData(BaseModel):
     bonds: List[EvaluatedFragmentBond]
     smiles_list: Optional[List[str]] = None
     xyz_block: Optional[str] = None
-
 # --- /predict/check/ ---
 class PredictCheckRequest(BaseModel):
     """
@@ -228,7 +209,6 @@ class PredictCheckRequest(BaseModel):
     molecule_id: str
     bond_idx: int
     products: List[str] = Field(...)
-
 class PredictCheckResponseData(BaseModel):
     """
     Salida de /predict/check/.
@@ -239,9 +219,7 @@ class PredictCheckResponseData(BaseModel):
     smiles_canonical: str
     bond: PredictedBond
     are_same_products: bool = False
-
     products: List[str]
-
 # --- /predict/info-smile-canonical/ ---
 class MoleculeSmileCanonicalRequest(BaseModel):
     """
@@ -258,8 +236,6 @@ class MoleculeSmileCanonicalResponseData(BaseModel):
     smiles: str
     smiles_canonical: str
     molecule_id: str
-
-
 # --- /infer/all/ ---
 class InferAllRequest(BaseModel):
     """
@@ -267,7 +243,6 @@ class InferAllRequest(BaseModel):
     - smiles: SMILES de la molécula
     """
     smiles: str
-
 class InferAllResponseData(BaseModel):
     """
     Salida de /infer/all/.
@@ -278,7 +253,6 @@ class InferAllResponseData(BaseModel):
     smiles_canonical: str
     molecule_id: str
     bonds: List[PredictedBond]
-
 # --- /download_report/ ---
 class DownloadReportRequest(BaseModel):
     """
@@ -288,14 +262,12 @@ class DownloadReportRequest(BaseModel):
     """
     smiles: str
     format: str
-
     @field_validator('format')
     @classmethod
     def _validate_format(cls, v: str) -> str:
         if v not in {"txt"}:
             raise ValueError("Formato no soportado: use 'txt'.")
         return v
-
 class DownloadReportResponseData(BaseModel):
     """
     Salida de /download_report/.
