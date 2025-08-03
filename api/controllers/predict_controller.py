@@ -74,19 +74,19 @@ def verify_smiles(smiles: str, mol_id: str) -> bool:
         raise ValueError(f"SMILES ID mismatch: expected {real_mol_id}, got {mol_id}")
     return True
 
-def is_single_bond(mol: Chem.Mol, bond_idx: int) -> bool:
+def is_valid_for_bde(mol: MoleculeInfo, bond_idx: int) -> bool:
     """Checks if a bond at the given index is a single bond.
     
     Args:
-        mol (Chem.Mol): The RDKit molecule object.
+        mol (MoleculeInfo): The molecule information object.
         bond_idx (int): The index of the bond to check.
     Returns:
         bool: True if the bond is single, False otherwise.
     """
-    if bond_idx < 0 or bond_idx >= mol.GetNumBonds():
-        raise ValueError(f"Bond index {bond_idx} out of range for molecule with {mol.GetNumBonds()} bonds")
-    bond = mol.GetBondWithIdx(bond_idx)
-    return bond.GetBondType() == Chem.BondType.SINGLE
+    if bond_idx < 0 or bond_idx >= mol.GetNumBonds(): # pyright: ignore[reportAttributeAccessIssue]
+        raise ValueError(f"Bond index {bond_idx} out of range for molecule with {mol.GetNumBonds()} bonds") # pyright: ignore[reportAttributeAccessIssue]
+    bond = mol.GetBondWithIdx(bond_idx) # type: ignore
+    return bond.GetBondType() ==  (Chem.BondType.SINGLE and not bond.IsInRing()) # pyright: ignore[reportAttributeAccessIssue]
 
 def calculate_canvas_size(mol: Chem.Mol, padding: int = 50, min_size: int = 300) -> Dict[str, int]:
     """Calculates the canvas size based on the molecule's bounding box.
@@ -99,11 +99,11 @@ def calculate_canvas_size(mol: Chem.Mol, padding: int = 50, min_size: int = 300)
         Dict[str, int]: Dictionary with 'width' and 'height' keys.
     """
     conf = mol.GetConformer()
-    positions = [conf.GetAtomPosition(i) for i in range(mol.GetNumAtoms())]
-    min_x, max_x = min(pos.x for pos in positions), max(pos.x for pos in positions)
-    min_y, max_y = min(pos.y for pos in positions), max(pos.y for pos in positions)
-    width = int(max_x - min_x) + padding
-    height = int(max_y - min_y) + padding
+    positions = [conf.GetAtomPosition(i) for i in range(mol.GetNumAtoms())]# type: ignore[attr-defined]
+    min_x, max_x = min(pos.x for pos in positions), max(pos.x for pos in positions)# type: ignore[attr-defined]
+    min_y, max_y = min(pos.y for pos in positions), max(pos.y for pos in positions)# type: ignore[attr-defined]
+    width = int(max_x - min_x) + padding# type: ignore[attr-defined]
+    height = int(max_y - min_y) + padding# type: ignore[attr-defined]
     return {"width": max(width, min_size), "height": max(height, min_size)}
 
 def generate_molecule_svg(mol: Chem.Mol, canvas: Dict[str, int]) -> Tuple[str, rdMolDraw2D.MolDraw2DSVG]:
@@ -121,11 +121,11 @@ def generate_molecule_svg(mol: Chem.Mol, canvas: Dict[str, int]) -> Tuple[str, r
     opts.includeAtomTags = True
     opts.addAtomIndices = True  # Enable atom indices in the default color (typically black)
     opts.addBondIndices = True  # Enable bond indices in the default color (typically black)
-    drawer.DrawMolecule(mol)
+    drawer.DrawMolecule(mol)# type: ignore[attr-defined]
     drawer.FinishDrawing()
     raw_svg = drawer.GetDrawingText()
     return ''.join(line.strip() for line in raw_svg.splitlines()), drawer
-
+ignore_missing_imports = True
 def get_atoms_info(mol: Chem.Mol, drawer: rdMolDraw2D.MolDraw2DSVG) -> Dict[str, Atom2D]:
     """Extracts atom information from the molecule.
     
@@ -181,7 +181,7 @@ def get_bonds_info(mol: Chem.Mol, drawer: rdMolDraw2D.MolDraw2DSVG) -> Dict[str,
             start_coords={"x": float(start_pt.x), "y": float(start_pt.y)},
             end_coords={"x": float(end_pt.x), "y": float(end_pt.y)},
             bond_atoms=bond_atoms,
-            bond_type=bond_type_str
+            bond_type=bond_type_str if bond_type_str in {"single", "double", "triple", "aromatic"} else "single"  # type: ignore
         )
     return bonds
 
@@ -194,7 +194,7 @@ def get_all_info_molecule(smiles: str) -> MoleculeInfo:
         MoleculeInfo: An object containing all relevant information about the molecule.
     """
     mol, mol_id, smiles_canonical = generate_id_smiles(smiles)
-    AllChem.Compute2DCoords(mol)
+    AllChem.Compute2DCoords(mol) # pyright: ignore[reportAttributeAccessIssue]
     canvas = calculate_canvas_size(mol)
     image_svg, drawer = generate_molecule_svg(mol, canvas)
     atoms = get_atoms_info(mol, drawer)
@@ -228,6 +228,20 @@ def predict_controller(request: PredictRequest) -> PredictResponseData:
         molecule_id=all_info.molecule_id
     )
 
+
+def get_bde_for_bond_indices(mol_info: MoleculeInfo, idx: int ) -> float | None:
+    """Predicts the bond dissociation energy (BDE) for a specific bond index in a molecule.
+    Args:
+        smiles (str): The SMILES representation of the molecule.
+        idx (int): The index of the bond to predict.
+    Returns:
+        float: The predicted BDE for the specified bond.
+    """
+    if not is_valid_for_bde(mol_info.mol, idx):
+        return None
+    bde = single_predict(mol_info.smiles_canonical, idx)
+    return bde.item() if isinstance(bde, torch.Tensor) else bde
+    
 def predict_single_controller(request: PredictSingleRequest) -> PredictSingleResponseData:
     """
     Controller para la predicción de BDE de un único enlace de una molécula.
@@ -239,15 +253,14 @@ def predict_single_controller(request: PredictSingleRequest) -> PredictSingleRes
     all_info = get_all_info_molecule(request.smiles)
     verify_smiles(all_info.smiles_canonical, request.molecule_id)
     mol = all_info.mol
-    if not is_single_bond(mol, request.bond_idx):
-        raise ValueError(f"Bond index {request.bond_idx} is not a single bond.")
+    if not is_valid_for_bde(mol, request.bond_idx):
+        raise ValueError(f"Bond index {request.bond_idx} is not a single bond or is in a ring.")
     bond = mol.GetBondWithIdx(request.bond_idx)
     begin_idx = bond.GetBeginAtomIdx()
     end_idx = bond.GetEndAtomIdx()
     atom1 = mol.GetAtomWithIdx(begin_idx)
     atom2 = mol.GetAtomWithIdx(end_idx)
-    bde = single_predict(all_info.smiles_canonical, request.bond_idx)
-    
+    bde = get_bde_for_bond_indices(all_info, request.bond_idx)
     predicted_bond = PredictedBond(
         idx=request.bond_idx,
         bde=bde,
@@ -273,20 +286,19 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
     """
     all_info = get_all_info_molecule(request.smiles)
     verify_smiles(all_info.smiles_canonical, request.molecule_id)
-    mol = all_info.mol
-    bonds = []
+
+    predicted_bonds = []
     for idx in request.bond_indices:
-        if not is_single_bond(mol, idx):
-            raise ValueError(f"Bond index {idx} is not a single bond.")
-    # Predecir BDEs para todos los enlaces
-    bde_list = multi_predict(all_info.smiles_canonical, request.bond_indices)
-    for i, idx in enumerate(request.bond_indices):
-        bond = mol.GetBondWithIdx(idx)
+        if not is_valid_for_bde(all_info.mol, idx):
+            raise ValueError(f"Bond index {idx} is not a single bond or is in a ring.")
+
+        bde = get_bde_for_bond_indices(all_info, idx)
+        bond = all_info.mol.GetBondWithIdx(idx)
         begin_idx = bond.GetBeginAtomIdx()
         end_idx = bond.GetEndAtomIdx()
-        atom1 = mol.GetAtomWithIdx(begin_idx)
-        atom2 = mol.GetAtomWithIdx(end_idx)
-        bde = bde_list[i].item() if hasattr(bde_list[i], 'item') else float(bde_list[i])
+        atom1 = all_info.mol.GetAtomWithIdx(begin_idx)
+        atom2 = all_info.mol.GetAtomWithIdx(end_idx)
+
         predicted_bond = PredictedBond(
             idx=idx,
             bde=bde,
@@ -295,12 +307,14 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
             bond_atoms=f"{atom1.GetSymbol()}-{atom2.GetSymbol()}",
             bond_type=bond.GetBondType().name.lower()
         )
-        bonds.append(predicted_bond)
+        predicted_bonds.append(predicted_bond)
+
     return PredictMultipleResponseData(
-        smiles=all_info.smiles_canonical,
-        molecule_id=all_info.molecule_id,
-        bonds=bonds
+        smiles=request.smiles,
+        molecule_id=request.molecule_id,
+        bonds=predicted_bonds
     )
+    
 def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
     """
     Controller para inferir la BDE de todos los enlaces posibles de una molécula.
@@ -312,24 +326,58 @@ def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
     all_info = get_all_info_molecule(request.smiles)
     mol = all_info.mol
 
-    # Obtener todos los índices de enlaces
-    allbonds = all_info.bonds
-    bonds_indices = []
-    for idx, bond in allbonds.items():
-        if (bond.bond_type == "single") and bond.start < bond.end:
-            bonds_indices.append(int(idx))
-    if not bonds_indices:
-        return InferAllResponseData(
-            smiles=all_info.smiles_canonical,
-            molecule_id=all_info.molecule_id,
-            bonds=None
+    predicted_bonds = []
+    for bond in mol.GetBonds():
+        bond_idx = bond.GetIdx()
+        begin_idx = bond.GetBeginAtomIdx()
+        end_idx = bond.GetEndAtomIdx()
+        atom1 = mol.GetAtomWithIdx(begin_idx)
+        atom2 = mol.GetAtomWithIdx(end_idx)
+
+        if is_valid_for_bde(mol, bond_idx):
+            bde = get_bde_for_bond_indices(all_info, bond_idx)
+        else:
+            bde = None
+
+        predicted_bond = PredictedBond(
+            idx=bond_idx,
+            bde=bde,
+            begin_atom_idx=begin_idx,
+            end_atom_idx=end_idx,
+            bond_atoms=f"{atom1.GetSymbol()}-{atom2.GetSymbol()}",
+            bond_type=bond.GetBondType().name.lower()
         )
-    logger.info(f"Se probaran los indices de enlaces: {bonds_indices}")
+        predicted_bonds.append(predicted_bond)
+
+    return InferAllResponseData(
+        smiles_canonical=all_info.smiles_canonical,
+        molecule_id=all_info.molecule_id,
+        bonds=predicted_bonds
+    )
 
 def fragment_controller(request: FragmentRequest) -> FragmentResponseData:
-    pass
+    # Esta función aún no está implementada. Se debe completar según los requisitos del proyecto.
+    return FragmentResponseData(
+        smiles_canonical="",
+        molecule_id="",
+        bonds=[]
+    )
+
 def predict_check_controller(request: PredictCheckRequest) -> PredictCheckResponseData:
-    pass
+    # Esta función aún no está implementada. Se debe completar según los requisitos del proyecto.
+    dummy_bond = PredictedBond(
+        idx=0,
+        bde=0.0,
+        begin_atom_idx=0,
+        end_atom_idx=1,
+        bond_atoms="H-H",
+        bond_type="single"
+    )
+    return PredictCheckResponseData(
+        smiles_canonical="",
+        bond=dummy_bond,
+        products=[]
+    )
 
 
 def download_report_controller(request: DownloadReportRequest) -> DownloadReportResponseData:
