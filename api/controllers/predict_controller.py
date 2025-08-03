@@ -1,90 +1,4 @@
 from typing import Literal, cast
-# Auxiliar para dibujar imagen principal
-def draw_main_image(pdf_canvas, svg_data):
-    try:
-        if not svg_data.strip().startswith("<svg"):
-            raise ValueError("Invalid SVG content for main molecule")
-        png_buffer = BytesIO()
-        try:
-            cairosvg.svg2png(bytestring=svg_data.encode("utf-8"), write_to=png_buffer, output_width=200, output_height=200)
-            png_buffer.seek(0)
-            pdf_canvas.drawImage(png_buffer, 50, 700, width=200, height=200)
-        finally:
-            png_buffer.close()
-    except Exception as e:
-        logger.error("Error processing SVG for molecule: %s", e)
-        pdf_canvas.drawString(50, 700, "Error generating molecule image")
-
-# Auxiliar para dibujar enlaces y BDEs
-def draw_bonds_and_bdes(pdf_canvas, mol, get_bde_for_bond_indices, text_x, text_y):
-    for bond in mol.GetBonds():
-        if text_y < 100:
-            pdf_canvas.showPage()
-            pdf_canvas.setFont("Helvetica", 10)
-            text_x = 50
-            text_y = 800
-        bond_idx = bond.GetIdx()
-        begin_idx = bond.GetBeginAtomIdx()
-        end_idx = bond.GetEndAtomIdx()
-        atom1 = mol.GetAtomWithIdx(begin_idx)
-        atom2 = mol.GetAtomWithIdx(end_idx)
-        bde = get_bde_for_bond_indices(bond_idx)
-        bde_text = f"{bde:.2f}" if bde is not None else "N/A"
-        pdf_canvas.drawString(
-            text_x, text_y, f"Bond {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()} (BDE: {bde_text})"
-        )
-        text_y -= 15
-    return text_x, text_y
-
-# Auxiliar para dibujar imagen de fragmento
-def draw_fragment_image_rdkit(pdf_canvas, fragment_smiles, x_position, y_position, canvas_size):
-    try:
-        fragment_mol = Chem.MolFromSmiles(fragment_smiles)
-        if fragment_mol is None:
-            raise ValueError(f"Invalid fragment SMILES: {fragment_smiles}")
-        AllChem.Compute2DCoords(fragment_mol) # type: ignore
-        fragment_svg, _ = generate_molecule_svg(fragment_mol, canvas_size)
-        if not fragment_svg.strip().startswith("<svg"):
-            raise ValueError(f"Invalid SVG content for fragment: {fragment_smiles}")
-        fragment_png_buffer = BytesIO()
-        try:
-            cairosvg.svg2png(bytestring=fragment_svg.encode("utf-8"), write_to=fragment_png_buffer, output_width=200, output_height=200)
-            fragment_png_buffer.seek(0)
-            pdf_canvas.drawImage(fragment_png_buffer, x_position, y_position, width=200, height=200)
-        finally:
-            fragment_png_buffer.close()
-    except Exception as e:
-        logger.error(f"Error generating RDKit image for fragment {fragment_smiles}: {e}")
-        pdf_canvas.drawString(x_position, y_position, "Error generating image for fragment")
-
-# Auxiliar para dibujar resultados de fragmentación
-def draw_fragmentation_results(pdf_canvas, mol, get_bde_for_bond_indices, get_fragments_from_bond, canvas_size, text_y):
-    if text_y < 200:
-        pdf_canvas.showPage()
-        pdf_canvas.setFont("Helvetica", 10)
-        text_y = 800
-    pdf_canvas.drawString(50, text_y, "Fragmentation Results:")
-    text_y -= 15
-    for bond in mol.GetBonds():
-        if text_y < 250:
-            pdf_canvas.showPage()
-            pdf_canvas.setFont("Helvetica", 10)
-            text_y = 800
-        bond_idx = bond.GetIdx()
-        bde = get_bde_for_bond_indices(bond_idx)
-        fragments = get_fragments_from_bond(mol, bond_idx)
-        pdf_canvas.line(50, text_y, 550, text_y)
-        text_y -= 10
-        pdf_canvas.drawString(50, text_y, f"Bond {bond_idx} (BDE: {bde if bde is not None else 'N/A'}):")
-        text_y -= 15
-        if len(fragments) == 2:
-            draw_fragment_image_rdkit(pdf_canvas, fragments[0], 50, text_y - 200, canvas_size)
-            draw_fragment_image_rdkit(pdf_canvas, fragments[1], 300, text_y - 200, canvas_size)
-            text_y -= 220
-        else:
-            pdf_canvas.drawString(50, text_y, f"Invalid fragments for bond {bond_idx}")
-            text_y -= 30
-    return text_y
 import base64
 from typing import Dict, Tuple
 from architecture import model
@@ -104,9 +18,6 @@ import hashlib
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 from deepbde.architecture.inference_util import multi_predict, single_predict
-from io import BytesIO
-import cairosvg
-
 @dataclass
 class MoleculeInfo:
     """
