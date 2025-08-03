@@ -1,34 +1,5 @@
 import os
 import pickle
-
-# Disk-based cache for SMILES queries (easy to clear by deleting folder)
-CACHE_VERSION = "v1"  # Change this to invalidate all cache
-CACHE_DIR = os.path.join(os.path.dirname(__file__), "_cache", CACHE_VERSION)
-os.makedirs(CACHE_DIR, exist_ok=True)
-
-def _cache_path(key: str) -> str:
-    safe_key = key.replace(os.sep, "_").replace(":", "_")
-    return os.path.join(CACHE_DIR, f"{safe_key}.pkl")
-
-def _cache_get(key: str):
-    path = _cache_path(key)
-    if os.path.exists(path):
-        try:
-            with open(path, "rb") as f:
-                return pickle.load(f)
-        except Exception:
-            return None
-    return None
-
-def _cache_set(key: str, value):
-    path = _cache_path(key)
-    cache_dir = os.path.dirname(path)
-    os.makedirs(cache_dir, exist_ok=True)
-    try:
-        with open(path, "wb") as f:
-            pickle.dump(value, f)
-    except Exception:
-        pass
 from typing import Literal, cast
 import base64
 from typing import Dict, Tuple
@@ -67,7 +38,31 @@ class MoleculeInfo:
     atoms: Dict[str, Atom2D]
     bonds: Dict[str, Bond2D]
     image_svg: str
-
+# Disk-based cache for SMILES queries (easy to clear by deleting folder)
+CACHE_VERSION = "v1"  # Change this to invalidate all cache
+CACHE_DIR = os.path.join(os.path.dirname(__file__), "_cache", CACHE_VERSION)
+os.makedirs(CACHE_DIR, exist_ok=True)
+def _cache_path(key: str) -> str:
+    safe_key = key.replace(os.sep, "_").replace(":", "_")
+    return os.path.join(CACHE_DIR, f"{safe_key}.pkl")
+def _cache_get(key: str):
+    path = _cache_path(key)
+    if os.path.exists(path):
+        try:
+            with open(path, "rb") as f:
+                return pickle.load(f)
+        except Exception:
+            return None
+    return None
+def _cache_set(key: str, value):
+    path = _cache_path(key)
+    cache_dir = os.path.dirname(path)
+    os.makedirs(cache_dir, exist_ok=True)
+    try:
+        with open(path, "wb") as f:
+            pickle.dump(value, f)
+    except Exception:
+        pass
 def generate_id_smiles(smiles: str) -> Tuple[Chem.Mol, str, str]:
     """Generates a unique ID and canonical SMILES representation for a molecule.
     Args:
@@ -91,7 +86,6 @@ def generate_id_smiles(smiles: str) -> Tuple[Chem.Mol, str, str]:
     smiles_canonical = Chem.MolToSmiles(mol, canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True)
     mol_id = hashlib.sha256(smiles_canonical.encode()).hexdigest()[:16]
     return mol, mol_id, smiles_canonical
-
 def verify_smiles(smiles: str, mol_id: str) -> bool:
     """
     Verifies if the provided molecule ID matches the generated ID from SMILES.
@@ -110,7 +104,6 @@ def verify_smiles(smiles: str, mol_id: str) -> bool:
     if mol_id != real_mol_id:
         raise ValueError(f"El ID de la molécula no coincide. SMILES: '{smiles}', ID esperado: '{real_mol_id}', ID recibido: '{mol_id}'")
     return True
-
 def is_valid_for_bde(mol: MoleculeInfo, bond_idx: int) -> bool:
     """
     Checks if a bond at the given index is a single, non-cyclic bond.
@@ -127,10 +120,8 @@ def is_valid_for_bde(mol: MoleculeInfo, bond_idx: int) -> bool:
         raise ValueError(f"Índice de enlace {bond_idx} fuera de rango para la molécula con {mol.GetNumBonds()} enlaces") # pyright: ignore[reportAttributeAccessIssue]
     bond = mol.GetBondWithIdx(bond_idx) # type: ignore
     return bond.GetBondType() == Chem.BondType.SINGLE and not bond.IsInRing()
-
 def calculate_canvas_size(mol: Chem.Mol, padding: int = 50, min_size: int = 300) -> Dict[str, int]:
     """Calculates the canvas size based on the molecule's bounding box.
-    
     Args:
         mol (Chem.Mol): The RDKit molecule object with 2D coordinates.
         padding (int): Padding to add around the molecule.
@@ -145,7 +136,6 @@ def calculate_canvas_size(mol: Chem.Mol, padding: int = 50, min_size: int = 300)
     width = int(max_x - min_x) + padding# type: ignore[attr-defined]
     height = int(max_y - min_y) + padding# type: ignore[attr-defined]
     return {"width": max(width, min_size), "height": max(height, min_size)}
-
 def generate_molecule_svg(mol: Chem.Mol, canvas: Dict[str, int]) -> Tuple[str, rdMolDraw2D.MolDraw2DSVG]:
     """Generates an SVG representation of the molecule with atom and bond indices in the default color.
     Args:
@@ -168,7 +158,6 @@ def generate_molecule_svg(mol: Chem.Mol, canvas: Dict[str, int]) -> Tuple[str, r
 ignore_missing_imports = True
 def get_atoms_info(mol: Chem.Mol, drawer: rdMolDraw2D.MolDraw2DSVG) -> Dict[str, Atom2D]:
     """Extracts atom information from the molecule.
-    
     Args:
         mol (Chem.Mol): The RDKit molecule object.
         drawer (rdMolDraw2D.MolDraw2DSVG): The RDKit SVG drawer object.
@@ -188,7 +177,6 @@ def get_atoms_info(mol: Chem.Mol, drawer: rdMolDraw2D.MolDraw2DSVG) -> Dict[str,
             smiles=atom_smiles
         )
     return atoms
-
 def get_bonds_info(mol: Chem.Mol, drawer: rdMolDraw2D.MolDraw2DSVG) -> Dict[str, Bond2D]:
     """Extracts bond information from the molecule.
     Args:
@@ -224,7 +212,6 @@ def get_bonds_info(mol: Chem.Mol, drawer: rdMolDraw2D.MolDraw2DSVG) -> Dict[str,
             bond_type=bond_type_str if bond_type_str in {"single", "double", "triple", "aromatic"} else "single"  # type: ignore
         )
     return bonds
-
 def get_all_info_molecule(smiles: str) -> MoleculeInfo:
     """
     Extracts all relevant information from a molecule given its SMILES representation.
@@ -235,10 +222,6 @@ def get_all_info_molecule(smiles: str) -> MoleculeInfo:
         MoleculeInfo: An object containing all relevant information about the molecule.
     Raises:
         ValueError: If the SMILES is invalid.
-    """
-    """
-    Extracts all relevant information from a molecule given its SMILES representation.
-    Uses a simple cache to avoid recomputation for repeated SMILES queries.
     """
     cached = _cache_get(f"info_{smiles}")
     if cached is not None:
@@ -265,7 +248,6 @@ def get_all_info_molecule(smiles: str) -> MoleculeInfo:
     )
     _cache_set(f"info_{smiles}", info)
     return info
-    
 def molecule_info_controller(request: MoleculeInfoRequest) -> MoleculeInfoResponseData:
     """Controller for predicting the bond dissociation energy (BDE) of a molecule.
     Args:
@@ -282,9 +264,6 @@ def molecule_info_controller(request: MoleculeInfoRequest) -> MoleculeInfoRespon
         bonds=all_info.bonds,
         molecule_id=all_info.molecule_id
     )
-
-
-
 def get_bde_for_bond_indices(mol_info: MoleculeInfo, idx: int ) -> float | None:
     """Predicts the bond dissociation energy (BDE) for a specific bond index in a molecule.
     Args:
@@ -292,10 +271,6 @@ def get_bde_for_bond_indices(mol_info: MoleculeInfo, idx: int ) -> float | None:
         idx (int): The index of the bond to predict.
     Returns:
         float: The predicted BDE for the specified bond.
-    """
-    """
-    Predicts the bond dissociation energy (BDE) for a specific bond index in a molecule.
-    Uses a simple cache for repeated queries on the same molecule and bond index.
     """
     cache_key = f"bde_{mol_info.smiles_canonical}_{idx}"
     cached = _cache_get(cache_key)
@@ -307,7 +282,6 @@ def get_bde_for_bond_indices(mol_info: MoleculeInfo, idx: int ) -> float | None:
     bde_val = bde.item() if isinstance(bde, torch.Tensor) else bde
     _cache_set(cache_key, bde_val)
     return bde_val
-    
 def predict_single_controller(request: PredictSingleRequest) -> PredictSingleResponseData:
     """
     Controller para la predicción de BDE de un único enlace de una molécula.
@@ -345,7 +319,6 @@ def predict_single_controller(request: PredictSingleRequest) -> PredictSingleRes
     )
     _cache_set(cache_key, result)
     return result
-
 def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMultipleResponseData:
     """
     Controller para la predicción de BDE de múltiples enlaces de una molécula.
@@ -363,19 +336,16 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
         return cached
     all_info = get_all_info_molecule(request.smiles)
     verify_smiles(all_info.smiles_canonical, request.molecule_id)
-
     predicted_bonds = []
     for idx in request.bond_indices:
         if not is_valid_for_bde(all_info.mol, idx):
             raise ValueError(f"Bond index {idx} is not a single bond or is in a ring.")
-
         bde = get_bde_for_bond_indices(all_info, idx)
         bond = all_info.mol.GetBondWithIdx(idx)
         begin_idx = bond.GetBeginAtomIdx()
         end_idx = bond.GetEndAtomIdx()
         atom1 = all_info.mol.GetAtomWithIdx(begin_idx)
         atom2 = all_info.mol.GetAtomWithIdx(end_idx)
-
         predicted_bond = PredictedBond(
             idx=idx,
             bde=bde,
@@ -385,7 +355,6 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
             bond_type=bond.GetBondType().name.lower()
         )
         predicted_bonds.append(predicted_bond)
-
     result = PredictMultipleResponseData(
         smiles=request.smiles,
         molecule_id=request.molecule_id,
@@ -393,7 +362,6 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
     )
     _cache_set(cache_key, result)
     return result
-    
 def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
     """
     Controller para inferir la BDE de todos los enlaces posibles de una molécula.
@@ -408,7 +376,6 @@ def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
         return cached
     all_info = get_all_info_molecule(request.smiles)
     mol = all_info.mol
-
     predicted_bonds = []
     for bond in mol.GetBonds():
         bond_idx = bond.GetIdx()
@@ -436,16 +403,11 @@ def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
     )
     _cache_set(cache_key, result)
     return result
-
-
-    
 def get_fragments_from_bond(mol: Chem.Mol, bond_idx: int) -> list[str]:
     """Gets the two fragments generated by breaking a bond in a molecule.
-
     Args:
         mol (Chem.Mol): The RDKit molecule object.
         bond_idx (int): The index of the bond to break.
-
     Returns:
         list[str]: A list of SMILES strings for the two fragments.
     """
@@ -470,7 +432,6 @@ def get_fragments_from_bond(mol: Chem.Mol, bond_idx: int) -> list[str]:
     except Exception as e:
         logger.error(f"Error fragmentando el enlace {bond_idx}: {e}")
         return []
-
 def  report_txt(smile:str) -> str:
     """Generates a report in text format for the molecule.
     Args:
@@ -516,8 +477,6 @@ def  report_txt(smile:str) -> str:
     report_lines="\n".join(report_lines)
     logger.info("Reporte generado:\n%s", report_lines)    
     return report_lines
-
-
 def download_report_controller(request: DownloadReportRequest) -> DownloadReportResponseData:
     """Generates and downloads a report for the molecule with all information of BDE and fragments.
     Args:
@@ -535,7 +494,6 @@ def download_report_controller(request: DownloadReportRequest) -> DownloadReport
         type="txt",
         report_base64=report_base64
     )
-
 def predict_check_controller(request: PredictCheckRequest) -> PredictCheckResponseData: #ignore
     try:
         all_info = get_all_info_molecule(request.smiles)
@@ -545,14 +503,12 @@ def predict_check_controller(request: PredictCheckRequest) -> PredictCheckRespon
     except Exception as e:
         logger.error(f"Error en predict_check_controller: {e}")
         raise ValueError(f"Error de validación: {e}")
-
     # Construct a safe cache key using all relevant request parameters
     products_key = ','.join(map(str, request.products)) if request.products else ''
     cache_key = f"check_{request.smiles}_{request.molecule_id}_{request.bond_idx}_{products_key}"
     cached = _cache_get(cache_key)
     if cached is not None:
         return cached
-
     mol = all_info.mol
     bond_idx = request.bond_idx
     bond = mol.GetBondWithIdx(bond_idx)
@@ -596,8 +552,6 @@ def predict_check_controller(request: PredictCheckRequest) -> PredictCheckRespon
     )
     _cache_set(cache_key, result)
     return result
-
-
 def molecule_smile_canonical_controller(smiles: MoleculeSmileCanonicalRequest) -> MoleculeSmileCanonicalResponseData:
     """Generates the canonical SMILES for a given molecule.
     Args:
@@ -614,7 +568,6 @@ def molecule_smile_canonical_controller(smiles: MoleculeSmileCanonicalRequest) -
         )
     except ValueError as e:
         raise ValueError(f"Invalid SMILES: {e}") from e
-
 def get_fragment_info(mol, idx: int):
     bond = mol.GetBondWithIdx(idx)
     begin_idx = bond.GetBeginAtomIdx()
@@ -632,7 +585,6 @@ def get_fragment_info(mol, idx: int):
         is_fragmentable=is_fragmentable
     )
     return evaluated_bond, is_fragmentable
-
 def get_xyz_block(smiles: str) -> str:
     m = Chem.MolFromSmiles(smiles)
     if m is None:
@@ -643,18 +595,15 @@ def get_xyz_block(smiles: str) -> str:
     except Exception:
         return ""
     return Chem.MolToXYZBlock(m)
-
 def select_bond_indices(request, mol):
     if request.bond_idx is not None:
         return [request.bond_idx]
     return [b.GetIdx() for b in mol.GetBonds() if b.GetBondType() == Chem.BondType.SINGLE and not b.IsInRing()]
-
 def add_smiles_fragments(smiles_list, bde_str, request_smiles, fragments):
     smiles_list.append("-" * 40)
     smiles_list.append(bde_str)
     smiles_list.append(request_smiles)
     smiles_list.extend(fragments)
-
 def add_xyz_fragments(xyz_blocks, bde_str, request_smiles, fragments):
     xyz_blocks.append("\n")
     xyz_blocks.append("-" * 40)
@@ -662,7 +611,6 @@ def add_xyz_fragments(xyz_blocks, bde_str, request_smiles, fragments):
     xyz_blocks.append(get_xyz_block(request_smiles))
     for frag in fragments:
         xyz_blocks.append(get_xyz_block(frag))
-
 def process_bond(idx, all_info, request, smiles_list, xyz_blocks):
     evaluated_bond, is_fragmentable = get_fragment_info(all_info.mol, idx)
     if is_fragmentable:
@@ -674,7 +622,6 @@ def process_bond(idx, all_info, request, smiles_list, xyz_blocks):
         if request.export_xyz and xyz_blocks is not None:
             add_xyz_fragments(xyz_blocks, bde_str, request.smiles, fragments)
     return evaluated_bond
-
 def fragment_controller(request: FragmentRequest) -> FragmentResponseData:
     all_info = get_all_info_molecule(request.smiles)
     mol = all_info.mol

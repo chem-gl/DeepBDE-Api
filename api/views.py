@@ -3,13 +3,11 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from rest_framework.views import APIView
 from pydantic import ValidationError
-
 from api.controllers.predict_controller import (
      molecule_info_controller, molecule_smile_canonical_controller, predict_single_controller, predict_multiple_controller,
     fragment_controller, predict_check_controller, infer_all_controller,
     download_report_controller
 )
-
 from .model.dto import (
     Atom2D, Bond2D, EvaluatedFragmentBond, MoleculeInfoRequest, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, PredictSingleRequest, PredictMultipleRequest,
     FragmentRequest, InferAllRequest, DownloadReportRequest, PredictCheckRequest,
@@ -17,7 +15,6 @@ from .model.dto import (
     FragmentResponseData, InferAllResponseData, DownloadReportResponseData, PredictCheckResponseData,
     ErrorDetail, ErrorCode, APIResponse, PredictedBond
 )
-
 # Define aliases for APIResponse with specific data types
 PredictResponse = APIResponse[MoleculeInfoResponseData]
 PredictSingleResponse = APIResponse[PredictSingleResponseData]
@@ -27,7 +24,6 @@ InferAllResponse = APIResponse[InferAllResponseData]
 DownloadReportResponse = APIResponse[DownloadReportResponseData]
 PredictCheckResponse = APIResponse[PredictCheckResponseData]
 ErrorResponse = APIResponse[None]
-
 # Utilidad para una respuesta de error consistente
 def _handle_validation_error(e: ValidationError, status_code=400):
     """Crea una respuesta de error estructurada a partir de un ValidationError."""
@@ -37,9 +33,6 @@ def _handle_validation_error(e: ValidationError, status_code=400):
     detail = ErrorDetail(code=code, message=first['msg'])
     payload = APIResponse[None](status="error", error=detail).model_dump()
     return Response(payload, status=status_code)
-
-
-
 class MoleculeSmileCanonicalView(APIView):
     """
     Endpoint para obtener el SMILES canónico de una molécula.
@@ -50,7 +43,6 @@ class MoleculeSmileCanonicalView(APIView):
         status="success",
         data="CCO"
     ).model_dump()
-
     @extend_schema(
         description="""        
         Devuelve el SMILES canónico de una molécula con hidrógenos explícitos.
@@ -105,8 +97,6 @@ class MoleculeSmileCanonicalView(APIView):
             return Response(resp.model_dump())
         except ValidationError as e:
             return _handle_validation_error(e)
-    
-
 class MoleculeInfoView(APIView):
     """
     Endpoint para obtener la imagen 2D de la molécula y la lista de enlaces con sus índices y átomos involucrados (sin predecir BDEs).
@@ -143,7 +133,6 @@ class MoleculeInfoView(APIView):
             molecule_id="a1b2c3d4e5f6a7b8"
         )
     ).model_dump()
-
     @extend_schema(
         description="""
         Devuelve información enriquecida de la molécula: SMILES canónico, imagen SVG, metadatos de canvas, posiciones de átomos y enlaces, id único.
@@ -179,7 +168,6 @@ class MoleculeInfoView(APIView):
                 ]
             )
         },
-
         examples=[
             OpenApiExample(
                 "Ejemplo de entrada / Example input",
@@ -201,7 +189,6 @@ class MoleculeInfoView(APIView):
             return Response(resp.model_dump())
         except ValidationError as e:
             return _handle_validation_error(e)
-
 class PredictSingleView(APIView):
     """
     Endpoint para predecir la energía de disociación de un enlace específico de la molécula (SMILES y bond_idx).
@@ -220,7 +207,6 @@ class PredictSingleView(APIView):
             )
         )
     ).model_dump()
-
     @extend_schema(
         description="""
         Predice la energía de disociación para un enlace específico de la molécula.
@@ -276,7 +262,6 @@ class PredictSingleView(APIView):
             return Response(resp.model_dump())
         except ValidationError as e:
             return _handle_validation_error(e)
-
 class PredictMultipleView(APIView):
     """
     Endpoint para predecir las energías de disociación para varios enlaces de la molécula (SMILES y bond_indices).
@@ -306,11 +291,9 @@ class PredictMultipleView(APIView):
             ]
         )
     ).model_dump()
-
     @extend_schema(
         description="""
         Predice las energías de disociación para varios enlaces de la molécula.
-        
         Predicts the dissociation energies for multiple bonds of the molecule.
         """,
         request=PredictMultipleRequest,
@@ -368,7 +351,6 @@ class PredictMultipleView(APIView):
             return Response(resp.model_dump())
         except ValidationError as e:
             return _handle_validation_error(e)
-
 class FragmentView(APIView):
     """
     Unified endpoint to generate molecular fragments in SMILES or XYZ format.
@@ -392,11 +374,9 @@ class FragmentView(APIView):
             xyz_block=None
         )
     ).model_dump()
-
     @extend_schema(
         description="""
         Genera fragmentos moleculares en formato SMILES o XYZ.
-        
         Generates molecular fragments in SMILES or XYZ format.
         """,
         request=FragmentRequest,
@@ -448,7 +428,6 @@ class FragmentView(APIView):
             return Response(resp.model_dump())
         except ValidationError as e:
             return _handle_validation_error(e)
-
 class PredictCheckView(APIView):
     """
     Endpoint para verificar si los productos generados por la escisión de un enlace corresponden a los esperados y predecir la BDE.
@@ -469,11 +448,9 @@ class PredictCheckView(APIView):
             products=["CC", "O"]
         )
     ).model_dump()
-
     @extend_schema(
         description="""
         Verifica productos generados por la escisión de un enlace y predice la BDE.
-        
         Verifies products generated by the cleavage of a bond and predicts the BDE.
         """,
         request=PredictCheckRequest,
@@ -530,7 +507,6 @@ class PredictCheckView(APIView):
             return Response(resp.model_dump())
         except ValidationError as e:
             return _handle_validation_error(e)
-
 class InferAllView(APIView):
     """
     Endpoint para predecir las energías de disociación para todos los enlaces simples de la molécula dada.
@@ -560,11 +536,9 @@ class InferAllView(APIView):
             ]
         )
     ).model_dump()
-
     @extend_schema(
         description="""
         Predice las energías de disociación para todos los enlaces simples de la molécula dada.
-        
         Predicts the dissociation energies for all single bonds of the given molecule.
         """,
         request=InferAllRequest,
@@ -616,7 +590,6 @@ class InferAllView(APIView):
             return Response(resp.model_dump())
         except ValidationError as e:
             return _handle_validation_error(e)
-
 class DownloadReportView(APIView):
     """
     Endpoint para generar y descargar un informe PDF con los resultados de la predicción para la molécula y enlace indicados.
@@ -627,11 +600,9 @@ class DownloadReportView(APIView):
             report_base64="JVBERi0xLjQKJcfs..."  # Ejemplo de string base64
         )
     ).model_dump()
-
     @extend_schema(
         description="""
         Genera y descarga un informe txt con los resultados de la predicción para la molécula 
-
         Generates and downloads a TXT report with the prediction results for the indicated molecule 
         """,
         request=DownloadReportRequest,
