@@ -22,6 +22,8 @@ def _cache_get(key: str):
 
 def _cache_set(key: str, value):
     path = _cache_path(key)
+    cache_dir = os.path.dirname(path)
+    os.makedirs(cache_dir, exist_ok=True)
     try:
         with open(path, "wb") as f:
             pickle.dump(value, f)
@@ -314,6 +316,10 @@ def predict_single_controller(request: PredictSingleRequest) -> PredictSingleRes
     Returns:
         PredictSingleResponseData: Contiene el SMILES canónico y la predicción del enlace.
     """
+    cache_key = f"single_{request.smiles}_{request.molecule_id}_{request.bond_idx}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     all_info = get_all_info_molecule(request.smiles)
     verify_smiles(all_info.smiles_canonical, request.molecule_id)
     mol = all_info.mol
@@ -333,10 +339,12 @@ def predict_single_controller(request: PredictSingleRequest) -> PredictSingleRes
         bond_atoms=f"{atom1.GetSymbol()}-{atom2.GetSymbol()}",
         bond_type=bond.GetBondType().name.lower()
     )
-    return PredictSingleResponseData(
+    result = PredictSingleResponseData(
         smiles_canonical=all_info.smiles_canonical,
         bond=predicted_bond
     )
+    _cache_set(cache_key, result)
+    return result
 
 def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMultipleResponseData:
     """
@@ -348,6 +356,11 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
     Returns:
         PredictMultipleResponseData: Respuesta con la lista de enlaces y sus BDEs predichos.
     """
+    indices_key = ','.join(map(str, request.bond_indices)) if request.bond_indices else ''
+    cache_key = f"multi_{request.smiles}_{request.molecule_id}_{indices_key}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     all_info = get_all_info_molecule(request.smiles)
     verify_smiles(all_info.smiles_canonical, request.molecule_id)
 
@@ -373,11 +386,13 @@ def predict_multiple_controller(request: PredictMultipleRequest) -> PredictMulti
         )
         predicted_bonds.append(predicted_bond)
 
-    return PredictMultipleResponseData(
+    result = PredictMultipleResponseData(
         smiles=request.smiles,
         molecule_id=request.molecule_id,
         bonds=predicted_bonds
     )
+    _cache_set(cache_key, result)
+    return result
     
 def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
     """
@@ -387,6 +402,10 @@ def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
     Returns:
         InferAllResponseData: Respuesta con la lista de enlaces y sus BDEs predichos o null si no se pueden predecir.
     """
+    cache_key = f"infer_{request.smiles}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     all_info = get_all_info_molecule(request.smiles)
     mol = all_info.mol
 
@@ -410,11 +429,13 @@ def infer_all_controller(request: InferAllRequest) -> InferAllResponseData:
             bond_type=bond.GetBondType().name.lower()
         )
         predicted_bonds.append(predicted_bond)
-    return InferAllResponseData(
+    result = InferAllResponseData(
         smiles_canonical=all_info.smiles_canonical,
         molecule_id=all_info.molecule_id,
         bonds=predicted_bonds
     )
+    _cache_set(cache_key, result)
+    return result
 
 
     
@@ -525,6 +546,13 @@ def predict_check_controller(request: PredictCheckRequest) -> PredictCheckRespon
         logger.error(f"Error en predict_check_controller: {e}")
         raise ValueError(f"Error de validación: {e}")
 
+    # Construct a safe cache key using all relevant request parameters
+    products_key = ','.join(map(str, request.products)) if request.products else ''
+    cache_key = f"check_{request.smiles}_{request.molecule_id}_{request.bond_idx}_{products_key}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     mol = all_info.mol
     bond_idx = request.bond_idx
     bond = mol.GetBondWithIdx(bond_idx)
@@ -551,24 +579,27 @@ def predict_check_controller(request: PredictCheckRequest) -> PredictCheckRespon
     products_canonical = [Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True) for s in products if Chem.MolFromSmiles(s) is not None]
     input_products_canonical = [Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True) for s in request.products if Chem.MolFromSmiles(s) is not None]
     if bde is None or not products_canonical:
-        return PredictCheckResponseData(
+        result = PredictCheckResponseData(
             smiles_canonical=all_info.smiles_canonical,
             bond=predicted_bond,
             are_same_products=False,
             products=["incompatible bond"]
         )
+        _cache_set(cache_key, result)
+        return result
     are_same_products = set(products_canonical) == set(input_products_canonical)
-    return PredictCheckResponseData(
+    result = PredictCheckResponseData(
         smiles_canonical=all_info.smiles_canonical,
         bond=predicted_bond,
         are_same_products=are_same_products,
         products=products_canonical
     )
+    _cache_set(cache_key, result)
+    return result
 
 
 def molecule_smile_canonical_controller(smiles: MoleculeSmileCanonicalRequest) -> MoleculeSmileCanonicalResponseData:
     """Generates the canonical SMILES for a given molecule.
-    
     Args:
         smiles (MoleculeSmileCanonicalRequest): Request object containing the SMILES string.
     Returns:
