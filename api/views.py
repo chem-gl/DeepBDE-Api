@@ -555,9 +555,9 @@ class DownloadReportView(APIView):
 
     @extend_schema(
         description="""
-        Genera y descarga un informe PDF con los resultados de la predicción para la molécula y enlace indicados.
-        
-        Generates and downloads a PDF report with the prediction results for the indicated molecule and bond.
+        Genera y descarga un informe txt con los resultados de la predicción para la molécula 
+
+        Generates and downloads a TXT report with the prediction results for the indicated molecule 
         """,
         request=DownloadReportRequest,
         responses={
@@ -590,12 +590,12 @@ class DownloadReportView(APIView):
         examples=[
             OpenApiExample(
                 "Entrada de ejemplo / Example input",
-                value={"smiles": "CCO", "format": "pdf"},
+                value={"smiles": "CCO", "format": "txt"},
                 request_only=True
             ),
             OpenApiExample(
                 "Entrada alternativa / Alternative input",
-                value={"smiles": "C1=CC=CC=C1", "format": "pdf"},
+                value={"smiles": "C1=CC=CC=C1", "format": "txt"},
                 request_only=True
             )
         ]

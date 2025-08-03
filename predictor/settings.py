@@ -70,7 +70,7 @@ SPECTACULAR_SETTINGS = {
         '4. Genera fragmentos moleculares con `/api/v1/fragment/`.\n'
         '5. Valida productos de escisión con `/api/v1/predict/check/`.\n'
         '6. Predice todas las BDE de enlaces simples con `/api/v1/infer/all/`.\n'
-        '7. Descarga un informe PDF con `/api/v1/download_report/`.\n\n'
+        '7. Descarga un informe TXT con `/api/v1/download_report/`.\n\n'
         '## API usage flow (English)\n'
         '1. Send a SMILES to `/api/v1/predict/` to get the 2D image and bond indices.\n'
         '2. Use `/api/v1/predict/single/` to predict the BDE of a specific bond.\n'
@@ -78,7 +78,7 @@ SPECTACULAR_SETTINGS = {
         '4. Generate molecular fragments with `/api/v1/fragment/`.\n'
         '5. Validate cleavage products with `/api/v1/predict/check/`.\n'
         '6. Predict all single bond BDEs with `/api/v1/infer/all/`.\n'
-        '7. Download a PDF report with `/api/v1/download_report/`.\n\n'
+        '7. Download a TXT report with `/api/v1/download_report/`.\n\n'
     ),
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': True,
