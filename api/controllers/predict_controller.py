@@ -317,7 +317,6 @@ def molecule_info_controller(request: MoleculeInfoRequest) -> MoleculeInfoRespon
         molecule_id=all_info.molecule_id
     )
 
-molecule_info_controller
 
 
 def get_bde_for_bond_indices(mol_info: MoleculeInfo, idx: int ) -> float | None:
@@ -600,12 +599,78 @@ def molecule_smile_canonical_controller(smiles: MoleculeSmileCanonicalRequest) -
     except ValueError as e:
         raise ValueError(f"Invalid SMILES: {e}") from e
 
-def fragment_controller(_: FragmentRequest) -> FragmentResponseData:
-    # Esta función aún no está implementada. Se debe completar según los requisitos del proyecto.
-    return FragmentResponseData(
-        smiles_canonical="",
-        molecule_id="",
-        bonds=[]
+def get_fragment_info(mol, idx: int):
+    bond = mol.GetBondWithIdx(idx)
+    begin_idx = bond.GetBeginAtomIdx()
+    end_idx = bond.GetEndAtomIdx()
+    atom1 = mol.GetAtomWithIdx(begin_idx)
+    atom2 = mol.GetAtomWithIdx(end_idx)
+    bond_type = bond.GetBondType().name.lower()
+    is_fragmentable = bond.GetBondType() == Chem.BondType.SINGLE and not bond.IsInRing()
+    evaluated_bond = EvaluatedFragmentBond(
+        idx=idx,
+        begin_atom=begin_idx,
+        end_atom=end_idx,
+        bond_atoms=f"{atom1.GetSymbol()}-{atom2.GetSymbol()}",
+        bond_type=bond_type,
+        is_fragmentable=is_fragmentable
     )
-    
-    
+    return evaluated_bond, is_fragmentable
+
+def get_xyz_block(smiles: str) -> str:
+    m = Chem.MolFromSmiles(smiles)
+    if m is None:
+        return ""
+    m = Chem.AddHs(m)
+    try:
+        AllChem.EmbedMolecule(m, randomSeed=42)  # type: ignore
+    except Exception:
+        return ""
+    return Chem.MolToXYZBlock(m)
+
+def select_bond_indices(request, mol):
+    if request.bond_idx is not None:
+        return [request.bond_idx]
+    return [b.GetIdx() for b in mol.GetBonds() if b.GetBondType() == Chem.BondType.SINGLE and not b.IsInRing()]
+
+def add_smiles_fragments(smiles_list, bde_str, request_smiles, fragments):
+    smiles_list.append("-" * 40)
+    smiles_list.append(bde_str)
+    smiles_list.append(request_smiles)
+    smiles_list.extend(fragments)
+
+def add_xyz_fragments(xyz_blocks, bde_str, request_smiles, fragments):
+    xyz_blocks.append("\n")
+    xyz_blocks.append("-" * 40)
+    xyz_blocks.append(bde_str)
+    xyz_blocks.append(get_xyz_block(request_smiles))
+    for frag in fragments:
+        xyz_blocks.append(get_xyz_block(frag))
+
+def process_bond(idx, all_info, request, smiles_list, xyz_blocks):
+    evaluated_bond, is_fragmentable = get_fragment_info(all_info.mol, idx)
+    if is_fragmentable:
+        fragments = get_fragments_from_bond(all_info.mol, idx)
+        bde = get_bde_for_bond_indices(all_info, idx)
+        bde_str = f"BDE: {bde}" if bde is not None else "BDE: N/A"
+        if request.export_smiles and smiles_list is not None:
+            add_smiles_fragments(smiles_list, bde_str, request.smiles, fragments)
+        if request.export_xyz and xyz_blocks is not None:
+            add_xyz_fragments(xyz_blocks, bde_str, request.smiles, fragments)
+    return evaluated_bond
+
+def fragment_controller(request: FragmentRequest) -> FragmentResponseData:
+    all_info = get_all_info_molecule(request.smiles)
+    mol = all_info.mol
+    smiles_list = [] if request.export_smiles else None
+    xyz_blocks = [] if request.export_xyz else None
+    bond_indices = select_bond_indices(request, mol)
+    bonds = [process_bond(idx, all_info, request, smiles_list, xyz_blocks) for idx in bond_indices]
+    xyz_block = "\n".join(xyz_blocks) if xyz_blocks is not None else None
+    return FragmentResponseData(
+        smiles_canonical=all_info.smiles_canonical,
+        molecule_id=all_info.molecule_id,
+        bonds=bonds,
+        smiles_list=smiles_list,
+        xyz_block=xyz_block
+    )

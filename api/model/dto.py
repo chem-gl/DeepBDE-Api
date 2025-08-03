@@ -183,7 +183,7 @@ class PredictMultipleResponseData(BaseModel):
 class FragmentRequest(BaseModel):
     """
     Entrada para /fragment/.
-    - smiles: SMILES
+    - smiles: SMILES con hidrógenos explícitos
     - molecule_id: ID de la molécula
     - bond_idx: Índice del enlace (opcional)
     - export_smiles: Si True, devuelve lista de SMILES
