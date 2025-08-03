@@ -2,29 +2,10 @@ openapi: 3.0.3
 info:
   title: DeepBDE API
   version: 1.0.0
-  description: |+
+  description: |
     API from https://github.com/MSRG/DeepBDE/.
 
     ## Flujo de uso de la API (Español)
-    - `POST /api/v1/predict/` — Obtén información enriquecida de la molécula: SMILES canónico, imagen SVG, posiciones de átomos y enlaces, ID único.
-    - `POST /api/v1/predict/single/` — Predice la BDE para un enlace específico de una molécula.
-    - `POST /api/v1/predict/multiple/` — Predice las BDEs para varios enlaces de una molécula.
-    - `POST /api/v1/fragment/` — Genera fragmentos moleculares en formato SMILES y/o XYZ, con valores de BDE para cada fragmento.
-    - `POST /api/v1/predict/check/` — Valida productos de escisión y compara con los fragmentos predichos, incluyendo el cálculo de BDE.
-    - `POST /api/v1/infer/all/` — Predice las BDEs para todos los enlaces simples de una molécula.
-    - `POST /api/v1/download_report/` — Descarga un informe TXT  con los resultados de predicción y fragmentación.
-    - `POST /api/v1/predict/info-smile-canonical/` — Obtén el SMILES canónico y el ID único de una molécula.
-
-    ## API usage flow (English)
-    - `POST /api/v1/predict/` — Get enriched molecule info: canonical SMILES, SVG image, atom and bond positions, and unique ID.
-    - `POST /api/v1/predict/single/` — Predict the BDE for a specific bond in a molecule.
-    - `POST /api/v1/predict/multiple/` — Predict BDEs for multiple bonds in a molecule.
-    - `POST /api/v1/fragment/` — Generate molecular fragments in SMILES and/or XYZ format, with BDE values for each fragment.
-    - `POST /api/v1/predict/check/` — Validate cleavage products and compare with predicted fragments, including BDE calculation.
-    - `POST /api/v1/infer/all/` — Predict BDEs for all single bonds in a molecule.
-    - `POST /api/v1/download_report/` — Download a TXT report with prediction and fragmentation results.
-    - `POST /api/v1/predict/info-smile-canonical/` — Get the canonical SMILES and unique ID for a molecule.
-
 paths:
   /api/schema/:
     get:

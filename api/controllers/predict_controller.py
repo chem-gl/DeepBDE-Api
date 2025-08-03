@@ -100,9 +100,9 @@ def verify_smiles(smiles: str, mol_id: str) -> bool:
     try:
         real_mol_id = generate_id_smiles(smiles)[1]
     except Exception as e:
-        raise ValueError(f"SMILES inválido: '{smiles}'. Error: {e}")
+        raise ValueError(f"Invalid SMILES: '{smiles}'. Error: {e}")
     if mol_id != real_mol_id:
-        raise ValueError(f"El ID de la molécula no coincide. SMILES: '{smiles}', ID esperado: '{real_mol_id}', ID recibido: '{mol_id}'")
+        raise ValueError(f"Molecule ID does not match. SMILES: '{smiles}', Expected ID: '{real_mol_id}', Received ID: '{mol_id}'")
     return True
 def is_valid_for_bde(mol: MoleculeInfo, bond_idx: int) -> bool:
     """
@@ -117,7 +117,7 @@ def is_valid_for_bde(mol: MoleculeInfo, bond_idx: int) -> bool:
         ValueError: If the bond index is out of range.
     """
     if bond_idx < 0 or bond_idx >= mol.GetNumBonds(): # pyright: ignore[reportAttributeAccessIssue]
-        raise ValueError(f"Índice de enlace {bond_idx} fuera de rango para la molécula con {mol.GetNumBonds()} enlaces") # pyright: ignore[reportAttributeAccessIssue]
+        raise ValueError(f"Bond index {bond_idx} out of range for molecule with {mol.GetNumBonds()} bonds") # pyright: ignore[reportAttributeAccessIssue]
     bond = mol.GetBondWithIdx(bond_idx) # type: ignore
     return bond.GetBondType() == Chem.BondType.SINGLE and not bond.IsInRing()
 def calculate_canvas_size(mol: Chem.Mol, padding: int = 50, min_size: int = 300) -> Dict[str, int]:
@@ -229,7 +229,7 @@ def get_all_info_molecule(smiles: str) -> MoleculeInfo:
     try:
         mol, mol_id, smiles_canonical = generate_id_smiles(smiles)
     except Exception as e:
-        raise ValueError(f"SMILES inválido: '{smiles}'. Error: {e}")
+        raise ValueError(f"Invalid SMILES: '{smiles}'. Error: {e}")
     AllChem.Compute2DCoords(mol) # pyright: ignore[reportAttributeAccessIssue]
     canvas = calculate_canvas_size(mol)
     image_svg, drawer = generate_molecule_svg(mol, canvas)
@@ -430,7 +430,7 @@ def get_fragments_from_bond(mol: Chem.Mol, bond_idx: int) -> list[str]:
         _cache_set(cache_key, result)
         return result
     except Exception as e:
-        logger.error(f"Error fragmentando el enlace {bond_idx}: {e}")
+        logger.error(f"Error fragmenting bond {bond_idx}: {e}")
         return []
 def  report_txt(smile:str) -> str:
     """Generates a report in text format for the molecule.
@@ -444,12 +444,12 @@ def  report_txt(smile:str) -> str:
     try:
         all_info = get_all_info_molecule(smile)
     except Exception as e:
-        logger.error(f"Error al procesar el SMILES '{smile}': {e}")
-        return f"Error: SMILES inválido ({smile}). Detalle: {e}"
+        logger.error(f"Error processing SMILES '{smile}': {e}")
+        return f"Error: Invalid SMILES ({smile}). Detail: {e}"
     report_lines = [
-        f"SMILES introducido: {smile}",
-        f"SMILES canónico con Hs: {all_info.smiles_canonical}",
-        "Enlaces y BDEs:"
+        f"SMILE introduced: {smile}",
+        f"SMILES canonical with hs: {all_info.smiles_canonical}",
+        "Bonds and BDEs:"
     ]
     for bond in all_info.mol.GetBonds():
         bond_idx = bond.GetIdx()
@@ -459,23 +459,23 @@ def  report_txt(smile:str) -> str:
         atom2 = all_info.mol.GetAtomWithIdx(end_idx)
         bde = get_bde_for_bond_indices(all_info, bond_idx)
         report_lines.append(
-            f"Enlace {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()} (BDE: {bde})"
+            f"Bond {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()} (BDE: {bde})"
         )
-    report_lines.append("Resultados de fragmentación:")
+    report_lines.append("Fragmentation results:")
     for bond in all_info.mol.GetBonds():
         bond_idx = bond.GetIdx()
         bde = get_bde_for_bond_indices(all_info, bond_idx)
         if bde is not None:
             fragments = get_fragments_from_bond(all_info.mol, bond_idx)
             report_lines.append(
-                f"Fragmento del enlace {bond_idx}: (BDE: {bde})"
+                f"Fragment from bond {bond_idx}: (BDE: {bde})"
             )
             if len(fragments) == 2:
-                report_lines.append(f"Fragmentos generados: {fragments[0]} y {fragments[1]}")
+                report_lines.append(f"Generated fragments: {fragments[0]} and {fragments[1]}")
             else:
-                report_lines.append(f"Fragmentación inválida para el enlace {bond_idx}")
+                report_lines.append(f"Invalid fragmentation for bond {bond_idx}")
     report_lines="\n".join(report_lines)
-    logger.info("Reporte generado:\n%s", report_lines)    
+    logger.info("Generated report:\n%s", report_lines)    
     return report_lines
 def download_report_controller(request: DownloadReportRequest) -> DownloadReportResponseData:
     """Generates and downloads a report for the molecule with all information of BDE and fragments.
@@ -486,7 +486,7 @@ def download_report_controller(request: DownloadReportRequest) -> DownloadReport
     """
     report_base64 = ""
     if request.format not in { "txt"}:
-        raise ValueError("Formato no soportado: use 'txt'.")
+        raise ValueError("Unsupported format: use 'txt'.")
     if request.format == "txt":
         report_content = report_txt(request.smiles)
         report_base64 = base64.b64encode(report_content.encode('utf-8')).decode('utf-8')
@@ -499,10 +499,10 @@ def predict_check_controller(request: PredictCheckRequest) -> PredictCheckRespon
         all_info = get_all_info_molecule(request.smiles)
         verify_smiles(all_info.smiles_canonical, request.molecule_id)
         if not is_valid_for_bde(all_info.mol, request.bond_idx):
-            raise ValueError(f"El índice de enlace {request.bond_idx} no corresponde a un enlace simple no cíclico.")
+            raise ValueError(f"Bond index {request.bond_idx} does not correspond to a single non-cyclic bond.")
     except Exception as e:
-        logger.error(f"Error en predict_check_controller: {e}")
-        raise ValueError(f"Error de validación: {e}")
+        logger.error(f"Error in predict_check_controller: {e}")
+        raise ValueError(f"Validation error: {e}")
     # Construct a safe cache key using all relevant request parameters
     products_key = ','.join(map(str, request.products)) if request.products else ''
     cache_key = f"check_{request.smiles}_{request.molecule_id}_{request.bond_idx}_{products_key}"
@@ -528,8 +528,8 @@ def predict_check_controller(request: PredictCheckRequest) -> PredictCheckRespon
     # Validate input products are valid SMILES
     invalid_smiles = [s for s in request.products if Chem.MolFromSmiles(s) is None]
     if invalid_smiles:
-        logger.error(f"SMILES inválidos en productos: {invalid_smiles}")
-        raise ValueError(f"Uno o más productos no son SMILES válidos: {invalid_smiles}")
+        logger.error(f"Invalid SMILES in products: {invalid_smiles}")
+        raise ValueError(f"One or more products are not valid SMILES: {invalid_smiles}")
     # Get generated products (fragments)
     products = get_fragments_from_bond(mol, bond_idx)
     products_canonical = [Chem.MolToSmiles(Chem.MolFromSmiles(s), canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True) for s in products if Chem.MolFromSmiles(s) is not None]
