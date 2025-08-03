@@ -227,7 +227,7 @@ class PredictCheckRequest(BaseModel):
     """
     smiles: str
     bond_idx: int
-    products: List[str] = Field(..., min_items=1)
+    products: List[str] = Field(...)
 
 class PredictCheckResponseData(BaseModel):
     """
