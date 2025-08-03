@@ -5,6 +5,7 @@ import base64
 from typing import Dict, Tuple
 from architecture import model
 from attr import dataclass
+from rpds import List
 import torch
 from api.model.dto import (
     Atom2D, Bond2D, MoleculeInfoRequest, MoleculeInfoResponseData, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, PredictSingleRequest, PredictSingleResponseData,
@@ -39,7 +40,7 @@ class MoleculeInfo:
     bonds: Dict[str, Bond2D]
     image_svg: str
 # Disk-based cache for SMILES queries (easy to clear by deleting folder)
-CACHE_VERSION = "v1"  # Change this to invalidate all cache
+CACHE_VERSION = "v2"  # Change this to invalidate all cache
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "_cache", CACHE_VERSION)
 os.makedirs(CACHE_DIR, exist_ok=True)
 def _cache_path(key: str) -> str:
@@ -630,10 +631,19 @@ def fragment_controller(request: FragmentRequest) -> FragmentResponseData:
     bond_indices = select_bond_indices(request, mol)
     bonds = [process_bond(idx, all_info, request, smiles_list, xyz_blocks) for idx in bond_indices]
     xyz_block = "\n".join(xyz_blocks) if xyz_blocks is not None else None
+    #lleno bde_s que tendra los bde de los enlaces solicitados
+    bde_s: list[tuple[int, float]] = []
+    for idx in bond_indices:
+        bde = get_bde_for_bond_indices(all_info, idx)
+        if bde is not None:
+            bde_s.append((idx, bde))
+    
+    
     return FragmentResponseData(
         smiles_canonical=all_info.smiles_canonical,
         molecule_id=all_info.molecule_id,
         bonds=bonds,
         smiles_list=smiles_list,
-        xyz_block=xyz_block
+        xyz_block=xyz_block,
+        bde_s=bde_s
     )

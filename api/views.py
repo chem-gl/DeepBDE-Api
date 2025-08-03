@@ -360,6 +360,7 @@ class FragmentView(APIView):
         data=FragmentResponseData(
             smiles_canonical="CCO",
             molecule_id="a1b2c3d4e5f6a7b8",
+            bde_s=[(1, 100.0)],  # Provide a value, e.g., None or a float if available
             bonds=[
                 EvaluatedFragmentBond(
                     idx=1,
@@ -367,7 +368,7 @@ class FragmentView(APIView):
                     end_atom=1,
                     bond_atoms="C-O",
                     is_fragmentable=True,
-                    bond_type="single"
+                    bond_type="single",
                 )
             ],
             smiles_list=["CC", "O"],

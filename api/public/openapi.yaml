@@ -263,6 +263,9 @@ paths:
                   value:
                     status: success
                     data:
+                      bde_s:
+                      - - 1
+                        - 100.0
                       smiles_canonical: CCO
                       molecule_id: a1b2c3d4e5f6a7b8
                       bonds:
@@ -1130,12 +1133,24 @@ components:
     FragmentResponseData:
       description: |-
         Salida de /fragment/.
+        - bde_s: Lista de tuplas (índice del enlace, BDE)
         - smiles_canonical: SMILES canónico
         - molecule_id: ID de la molécula
         - bonds: Lista de enlaces evaluados
         - smiles_list: Lista de SMILES (opcional)
         - xyz_block: Cadena XYZ (opcional)
       properties:
+        bde_s:
+          description: Lista de tuplas (índice del enlace, BDE)
+          items:
+            maxItems: 2
+            minItems: 2
+            prefixItems:
+            - type: integer
+            - type: number
+            type: array
+          title: Bde S
+          type: array
         smiles_canonical:
           title: Smiles Canonical
           type: string
@@ -1162,6 +1177,7 @@ components:
           default: null
           title: Xyz Block
       required:
+      - bde_s
       - smiles_canonical
       - molecule_id
       - bonds

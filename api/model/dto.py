@@ -186,12 +186,14 @@ class FragmentRequest(BaseModel):
 class FragmentResponseData(BaseModel):
     """
     Salida de /fragment/.
+    - bde_s: Lista de tuplas (índice del enlace, BDE)
     - smiles_canonical: SMILES canónico
     - molecule_id: ID de la molécula
     - bonds: Lista de enlaces evaluados
     - smiles_list: Lista de SMILES (opcional)
     - xyz_block: Cadena XYZ (opcional)
     """
+    bde_s: List[tuple[int, float]] = Field(..., description="Lista de tuplas (índice del enlace, BDE)")
     smiles_canonical: str
     molecule_id: str
     bonds: List[EvaluatedFragmentBond]
