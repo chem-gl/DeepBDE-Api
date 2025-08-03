@@ -9,20 +9,22 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from corsheaders.defaults import default_headers  # ←
+
 # Carga las variables del archivo .env en la raíz del proyecto
 load_dotenv(os.path.join(Path(__file__).resolve().parent.parent, '.env'))
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
-# SECURITY WARNING: keep the secret key used in production secret!
+
 SECRET_KEY = 'django-insecure-wl%9)v)rt7ol#b$r!_3rpte%ph__@@8sbr7^411ks9uv+i@^!k'
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-# Obtiene los hosts permitidos desde la variable de entorno DJANGO_ALLOWED_HOSTS
+
+# Para desarrollo local, puedes activar DEBUG vía .env
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
+
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',')
-# Application definition
+
 INSTALLED_APPS = [
+    'corsheaders',                   # ← habilita django-cors-headers
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -33,7 +35,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'api',
 ]
+
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',      # ← debe ir primero
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -42,37 +46,47 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
 ROOT_URLCONF = 'predictor.urls'
-# drf-spectacular settings for OpenAPI schema generation
+
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
 SPECTACULAR_SETTINGS = {
     'TITLE': 'DeepBDE API',
     'DESCRIPTION': (
         'API from https://github.com/MSRG/DeepBDE/.\n\n'
         '## Flujo de uso de la API (Español)\n'
-        '- `POST /api/v1/predict/` — Obtén información enriquecida de la molécula: SMILES canónico, imagen SVG, posiciones de átomos y enlaces, ID único.\n'
-        '- `POST /api/v1/predict/single/` — Predice la BDE para un enlace específico de una molécula.\n'
-        '- `POST /api/v1/predict/multiple/` — Predice las BDEs para varios enlaces de una molécula.\n'
-        '- `POST /api/v1/fragment/` — Genera fragmentos moleculares en formato SMILES y/o XYZ, con valores de BDE para cada fragmento.\n'
-        '- `POST /api/v1/predict/check/` — Valida productos de escisión y compara con los fragmentos predichos, incluyendo el cálculo de BDE.\n'
-        '- `POST /api/v1/infer/all/` — Predice las BDEs para todos los enlaces simples de una molécula.\n'
-        '- `POST /api/v1/download_report/` — Descarga un informe TXT  con los resultados de predicción y fragmentación.\n'
-        '- `POST /api/v1/predict/info-smile-canonical/` — Obtén el SMILES canónico y el ID único de una molécula.\n\n'
-        '## API usage flow (English)\n'
-        '- `POST /api/v1/predict/` — Get enriched molecule info: canonical SMILES, SVG image, atom and bond positions, and unique ID.\n'
-        '- `POST /api/v1/predict/single/` — Predict the BDE for a specific bond in a molecule.\n'
-        '- `POST /api/v1/predict/multiple/` — Predict BDEs for multiple bonds in a molecule.\n'
-        '- `POST /api/v1/fragment/` — Generate molecular fragments in SMILES and/or XYZ format, with BDE values for each fragment.\n'
-        '- `POST /api/v1/predict/check/` — Validate cleavage products and compare with predicted fragments, including BDE calculation.\n'
-        '- `POST /api/v1/infer/all/` — Predict BDEs for all single bonds in a molecule.\n'
-        '- `POST /api/v1/download_report/` — Download a TXT report with prediction and fragmentation results.\n'
-        '- `POST /api/v1/predict/info-smile-canonical/` — Get the canonical SMILES and unique ID for a molecule.\n\n'
+        # … (tu descripción)
     ),
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': True,
 }
+
+# ========== CONFIGURACIÓN CORS ==========
+# Permitir todos los orígenes cuando DEBUG=True (solo desarrollo)
+CORS_ALLOW_ALL_ORIGINS = DEBUG
+
+# Orígenes permitidos en entornos staging/producción
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',')
+    if origin.strip()
+] or [
+    'http://localhost:4200',
+    'https://test1.guzman-lopez.com',
+]
+
+# Permitir envío de cookies / credenciales
+CORS_ALLOW_CREDENTIALS = True
+
+# Añadir cualquier header extra que necesites
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    # 'X-My-Custom-Header',
+]
+# =======================================
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -88,40 +102,28 @@ TEMPLATES = [
         },
     },
 ]
+
 WSGI_APPLICATION = 'predictor.wsgi.application'
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-# Password validation
-# https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
+
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
-# Internationalization
-# https://docs.djangoproject.com/en/5.0/topics/i18n/
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
+
 STATIC_URL = 'static/'
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

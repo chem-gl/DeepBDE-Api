@@ -15,3 +15,4 @@ networkx==2.8.8
 reportlab
 cairosvg
 python-dotenv
+django-cors-headers
