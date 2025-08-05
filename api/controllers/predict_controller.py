@@ -808,6 +808,3 @@ def obtain_bde_fragments_controller(request: ObtainBDEFragmentsRequest) -> Obtai
     # Guardar en caché
     cache_set(cache_key, result)
     return result
-    
-    
-    
