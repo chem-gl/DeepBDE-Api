@@ -126,7 +126,8 @@ SPECTACULAR_SETTINGS = {
         '- BDE values are returned in kcal/mol / Los valores BDE se devuelven en kcal/mol\n'
         '- Molecule IDs are SHA256 hashes (16 chars) / Los IDs de molécula son hashes SHA256 (16 caracteres)\n'
         '- Supports SMILES input with automatic canonicalization / Soporta entrada SMILES con canonicalización automática\n'
-        '- Caching system for improved performance / Sistema de caché para mejor rendimiento\n'
+        '- Caching system for improved performance / Sistema de caché para mejor rendimiento \n\n\n'
+        '- cache path: api/controllers/_cache'
     ),
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': True,
