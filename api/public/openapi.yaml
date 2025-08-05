@@ -153,6 +153,160 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/v1/BDEEvaluate/:
+    post:
+      operationId: v1_BDEEvaluate_create
+      description: "\n        Genera fragmentos moleculares en formato SMILES o XYZ.\n\
+        \        Generates molecular fragments in SMILES or XYZ format.\n        "
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BDEEvaluateRequest'
+            examples:
+              EntradaDeEjemplo/ExampleInput:
+                value:
+                  smiles: CCO
+                  molecule_id: a1b2c3d4e5f6a7b8
+                  bonds_idx:
+                  - 0
+                  - 1
+                  export_smiles: true
+                  export_xyz: false
+                summary: Entrada de ejemplo / Example input
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BDEEvaluateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BDEEvaluateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse[FragmentResponseData]'
+              examples:
+                EntradaDeEjemplo/ExampleInput:
+                  value:
+                    smiles: CCO
+                    molecule_id: a1b2c3d4e5f6a7b8
+                    bonds_idx:
+                    - 0
+                    - 1
+                    export_smiles: true
+                    export_xyz: false
+                  summary: Entrada de ejemplo / Example input
+                EjemploExitoso:
+                  value:
+                    status: success
+                    data:
+                      smiles_canonical: CCO
+                      molecule_id: a1b2c3d4e5f6a7b8
+                      bonds_predicted: []
+                      smiles_list: null
+                      xyz_block: null
+                    error: null
+                  summary: Ejemplo exitoso
+          description: Respuesta exitosa / Successful response
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse[NoneType]'
+              examples:
+                ErrorPorFormatoInválido:
+                  value:
+                    status: error
+                    detail: Formato no soportado
+                  summary: Error por formato inválido
+          description: Error de validación / Validation error
+  /api/v1/ObtainBDEFragments/:
+    post:
+      operationId: v1_ObtainBDEFragments_create
+      description: "\n        Obtiene la energía de disociación de enlaces para una\
+        \ molécula basada en SMILES y los fragmentos proporcionados.\n        Obtains\
+        \ the dissociation energy of bonds for a molecule based on SMILES and provided\
+        \ fragments.\n        "
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObtainBDEFragmentsRequest'
+            examples:
+              EntradaDeEjemplo/ExampleInput:
+                value:
+                  smiles: CCO
+                  fragments:
+                    Smile1: C
+                    Smile2: O
+                summary: Entrada de ejemplo / Example input
+              EntradaAlternativa/AlternativeInput:
+                value:
+                  smiles: C1=CC=CC=C1
+                  fragments:
+                    Smile1: C
+                    Smile2: C
+                summary: Entrada alternativa / Alternative input
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ObtainBDEFragmentsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ObtainBDEFragmentsRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObtainBDEFragmentsResponseData'
+              examples:
+                EjemploExitoso:
+                  value:
+                    status: success
+                    data:
+                      smiles_canonical: CCO
+                      molecule_id: a1b2c3d4e5f6a7b8
+                      bonds_predicted:
+                        idx: 1
+                        bde: 95.0
+                        begin_atom_idx: 0
+                        end_atom_idx: 1
+                        bond_atoms: C-O
+                        bond_type: single
+                        is_fragmentable: true
+                      fragments:
+                        Smile1: C
+                        Smile2: O
+                    error: null
+                  summary: Ejemplo exitoso
+          description: Respuesta exitosa / Successful response
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse[NoneType]'
+              examples:
+                ErrorPorSMILESInválido:
+                  value:
+                    status: error
+                    detail: Formato SMILES inválido
+                  summary: Error por SMILES inválido
+          description: Error de validación / Validation error
   /api/v1/download_report/:
     post:
       operationId: v1_download_report_create
@@ -201,84 +355,6 @@ paths:
                     data:
                       type: pdf
                       report_base64: JVBERi0xLjQKJcfs...
-                    error: null
-                  summary: Ejemplo exitoso
-          description: Respuesta exitosa / Successful response
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse[NoneType]'
-              examples:
-                ErrorPorFormatoInválido:
-                  value:
-                    status: error
-                    detail: Formato no soportado
-                  summary: Error por formato inválido
-          description: Error de validación / Validation error
-  /api/v1/fragment/:
-    post:
-      operationId: v1_fragment_create
-      description: "\n        Genera fragmentos moleculares en formato SMILES o XYZ.\n\
-        \        Generates molecular fragments in SMILES or XYZ format.\n        "
-      tags:
-      - v1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/FragmentRequest'
-            examples:
-              EntradaDeEjemplo/ExampleInput:
-                value:
-                  smiles: CCO
-                  molecule_id: a1b2c3d4e5f6a7b8
-                  export_smiles: true
-                summary: Entrada de ejemplo / Example input
-              EntradaAlternativa/AlternativeInput:
-                value:
-                  smiles: C1=CC=CC=C1
-                  molecule_id: h1g2f3e4d5c6b7a8
-                  export_xyz: true
-                summary: Entrada alternativa / Alternative input
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/FragmentRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/FragmentRequest'
-        required: true
-      security:
-      - cookieAuth: []
-      - basicAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse[FragmentResponseData]'
-              examples:
-                EjemploExitoso:
-                  value:
-                    status: success
-                    data:
-                      bde_s:
-                      - - 1
-                        - 100.0
-                      smiles_canonical: CCO
-                      molecule_id: a1b2c3d4e5f6a7b8
-                      bonds:
-                      - idx: 1
-                        begin_atom: 0
-                        end_atom: 1
-                        bond_atoms: C-O
-                        bond_type: single
-                        is_fragmentable: true
-                      smiles_list:
-                      - CC
-                      - O
-                      xyz_block: null
                     error: null
                   summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
@@ -347,12 +423,14 @@ paths:
                         end_atom_idx: 1
                         bond_atoms: C-O
                         bond_type: single
+                        is_fragmentable: true
                       - idx: 2
                         bde: 100.0
                         begin_atom_idx: 1
                         end_atom_idx: 2
                         bond_atoms: C-C
                         bond_type: single
+                        is_fragmentable: true
                     error: null
                   summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
@@ -430,6 +508,7 @@ paths:
                         end_atom_idx: 1
                         bond_atoms: C-O
                         bond_type: single
+                        is_fragmentable: true
                       are_same_products: true
                       products:
                       - CC
@@ -676,12 +755,14 @@ paths:
                         end_atom_idx: 1
                         bond_atoms: C-O
                         bond_type: single
+                        is_fragmentable: true
                       - idx: 2
                         bde: 100.0
                         begin_atom_idx: 1
                         end_atom_idx: 2
                         bond_atoms: C-C
                         bond_type: single
+                        is_fragmentable: true
                     error: null
                   summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
@@ -755,6 +836,7 @@ paths:
                         end_atom_idx: 1
                         bond_atoms: C-O
                         bond_type: single
+                        is_fragmentable: true
                     error: null
                   summary: Ejemplo exitoso
           description: Respuesta exitosa / Successful response
@@ -952,6 +1034,42 @@ components:
       - symbol
       title: Atom2D
       type: object
+    BDEEvaluateRequest:
+      description: |-
+        Entrada para /fragment/.
+        - smiles: SMILES con hidrógenos explícitos
+        - molecule_id: ID de la molécula (opcional si se proporcionan fragmentos)
+        - bonds_idx: Lista de índices de enlaces (opcional si se proporcionan fragmentos)
+        - export_smiles: Indica si se debe exportar la lista de SMILES de los fragmentos
+        - export_xyz: Indica si se debe exportar el bloque XYZ de los fragmentos
+      properties:
+        smiles:
+          title: Smiles
+          type: string
+        molecule_id:
+          title: Molecule Id
+          type: string
+        bonds_idx:
+          anyOf:
+          - items:
+              type: integer
+            type: array
+          - type: 'null'
+          title: Bonds Idx
+        export_smiles:
+          default: false
+          title: Export Smiles
+          type: boolean
+        export_xyz:
+          default: false
+          title: Export Xyz
+          type: boolean
+      required:
+      - smiles
+      - molecule_id
+      - bonds_idx
+      title: BDEEvaluateRequest
+      type: object
     Bond2D:
       description: |-
         Información 2D de un enlace para visualización y metadatos.
@@ -1059,108 +1177,25 @@ components:
       - message
       title: ErrorDetail
       type: object
-    EvaluatedFragmentBond:
-      description: |-
-        Representa un enlace evaluado para fragmentación.
-        - idx: Índice del enlace en la molécula.
-        - begin_atom: Índice del átomo inicial del enlace.
-        - end_atom: Índice del átomo final del enlace.
-        - bond_atoms: Representación legible del enlace (ejemplo: 'C-H').
-        - is_fragmentable: Indica si el enlace puede fragmentarse (enlace simple, etc.).
-      properties:
-        idx:
-          title: Idx
-          type: integer
-        begin_atom:
-          title: Begin Atom
-          type: integer
-        end_atom:
-          title: End Atom
-          type: integer
-        bond_atoms:
-          title: Bond Atoms
-          type: string
-        bond_type:
-          allOf:
-          - $ref: '#/components/schemas/BondTypeEnum'
-          default: single
-          title: Bond Type
-        is_fragmentable:
-          title: Is Fragmentable
-          type: boolean
-      required:
-      - idx
-      - begin_atom
-      - end_atom
-      - bond_atoms
-      - is_fragmentable
-      title: EvaluatedFragmentBond
-      type: object
-    FragmentRequest:
-      description: |-
-        Entrada para /fragment/.
-        - smiles: SMILES con hidrógenos explícitos
-        - molecule_id: ID de la molécula
-        - bond_idx: Índice del enlace (opcional)
-        - export_smiles: Si True, devuelve lista de SMILES
-        - export_xyz: Si True, devuelve bloque XYZ
-      properties:
-        smiles:
-          title: Smiles
-          type: string
-        molecule_id:
-          title: Molecule Id
-          type: string
-        bond_idx:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          default: null
-          title: Bond Idx
-        export_smiles:
-          default: false
-          title: Export Smiles
-          type: boolean
-        export_xyz:
-          default: false
-          title: Export Xyz
-          type: boolean
-      required:
-      - smiles
-      - molecule_id
-      title: FragmentRequest
-      type: object
     FragmentResponseData:
       description: |-
         Salida de /fragment/.
-        - bde_s: Lista de tuplas (índice del enlace, BDE)
-        - smiles_canonical: SMILES canónico
+        - smiles_canonical: SMILES canónico de la molécula original
         - molecule_id: ID de la molécula
-        - bonds: Lista de enlaces evaluados
-        - smiles_list: Lista de SMILES (opcional)
-        - xyz_block: Cadena XYZ (opcional)
+        - bonds_predicted: Lista de enlaces predichos
+        - smiles_list: Lista de SMILES de los fragmentos (opcional)
+        - xyz_block: Bloque XYZ de los fragmentos (opcional)
       properties:
-        bde_s:
-          description: Lista de tuplas (índice del enlace, BDE)
-          items:
-            maxItems: 2
-            minItems: 2
-            prefixItems:
-            - type: integer
-            - type: number
-            type: array
-          title: Bde S
-          type: array
         smiles_canonical:
           title: Smiles Canonical
           type: string
         molecule_id:
           title: Molecule Id
           type: string
-        bonds:
+        bonds_predicted:
           items:
-            $ref: '#/components/schemas/EvaluatedFragmentBond'
-          title: Bonds
+            $ref: '#/components/schemas/PredictedBond'
+          title: Bonds Predicted
           type: array
         smiles_list:
           anyOf:
@@ -1177,11 +1212,24 @@ components:
           default: null
           title: Xyz Block
       required:
-      - bde_s
       - smiles_canonical
       - molecule_id
-      - bonds
+      - bonds_predicted
       title: FragmentResponseData
+      type: object
+    Fragments:
+      description: Fragmentos de la molécula.
+      properties:
+        Smile1:
+          title: Smile1
+          type: string
+        Smile2:
+          title: Smile2
+          type: string
+      required:
+      - Smile1
+      - Smile2
+      title: Fragments
       type: object
     InferAllRequest:
       description: |-
@@ -1283,6 +1331,47 @@ components:
       required:
       - smiles
       title: MoleculeSmileCanonicalRequest
+      type: object
+    ObtainBDEFragmentsRequest:
+      description: |-
+        Entrada para /ObtainBDEFragments/.
+        - smiles: SMILES de la molécula
+        - fragments: Fragmentos de la molécula
+      properties:
+        smiles:
+          title: Smiles
+          type: string
+        fragments:
+          $ref: '#/components/schemas/Fragments'
+      required:
+      - smiles
+      - fragments
+      title: ObtainBDEFragmentsRequest
+      type: object
+    ObtainBDEFragmentsResponseData:
+      description: |-
+        Salida de /ObtainBDEFragments/.
+        - smiles_canonical: SMILES canónico de la molécula original
+        - molecule_id: ID de la molécula
+        - bonds_predicted: Lista de enlaces predichos
+        - fragments: Fragmentos de la molécula
+      properties:
+        smiles_canonical:
+          title: Smiles Canonical
+          type: string
+        molecule_id:
+          title: Molecule Id
+          type: string
+        bonds_predicted:
+          $ref: '#/components/schemas/PredictedBond'
+        fragments:
+          $ref: '#/components/schemas/Fragments'
+      required:
+      - smiles_canonical
+      - molecule_id
+      - bonds_predicted
+      - fragments
+      title: ObtainBDEFragmentsResponseData
       type: object
     PredictCheckRequest:
       description: |-
@@ -1456,12 +1545,16 @@ components:
           - $ref: '#/components/schemas/BondTypeEnum'
           default: single
           title: Bond Type
+        is_fragmentable:
+          title: Is Fragmentable
+          type: boolean
       required:
       - idx
       - bde
       - begin_atom_idx
       - end_atom_idx
       - bond_atoms
+      - is_fragmentable
       title: PredictedBond
       type: object
     StatusEnum:

@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any, Literal, TypeVar, Generic
+from typing import List, Optional, Dict, Any, Literal, TypeVar, Generic, Union
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator, ValidationError
 # ---------- Enumeración de códigos de error ----------
@@ -9,6 +9,7 @@ class ErrorCode(str, Enum):
     UNSUPPORTED_FORMAT = "UNSUPPORTED_FORMAT"
     MISSING_EXPORT_OPTION = "MISSING_EXPORT_OPTION"
 # ---------- Clases comunes ----------
+
 class ErrorDetail(BaseModel):
     """
     Detalle de error estándar para respuestas de la API.
@@ -32,21 +33,9 @@ class PredictedBond(BaseModel):
     end_atom_idx: int  # Índice del átomo final del enlace.
     bond_atoms: str  # Representación legible del enlace (ejemplo: 'C-O').
     bond_type: Literal["single", "double", "triple", "aromatic"] = "single" 
-class EvaluatedFragmentBond(BaseModel):
-    """
-    Representa un enlace evaluado para fragmentación.
-    - idx: Índice del enlace en la molécula.
-    - begin_atom: Índice del átomo inicial del enlace.
-    - end_atom: Índice del átomo final del enlace.
-    - bond_atoms: Representación legible del enlace (ejemplo: 'C-H').
-    - is_fragmentable: Indica si el enlace puede fragmentarse (enlace simple, etc.).
-    """
-    idx: int  # Índice del enlace en la molécula.
-    begin_atom: int  # Índice del átomo inicial del enlace.
-    end_atom: int  # Índice del átomo final del enlace.
-    bond_atoms: str  # Representación legible del enlace (ejemplo: 'C-H').
-    bond_type: Literal["single", "double", "triple", "aromatic"] = "single"
     is_fragmentable: bool  # Indica si el enlace puede fragmentarse (enlace simple, etc.).
+
+
 class Atom2D(BaseModel):
     """
     Información 2D de un átomo para visualización y metadatos.
@@ -162,52 +151,43 @@ class PredictMultipleResponseData(BaseModel):
     smiles: str
     molecule_id: str
     bonds: List[PredictedBond]
+    
+
 # --- /fragment/ ---
-class FragmentRequest(BaseModel):
+class BDEEvaluateRequest(BaseModel):
     """
     Entrada para /fragment/.
     - smiles: SMILES con hidrógenos explícitos
-    - molecule_id: ID de la molécula
-    - bond_idx: Índice del enlace (opcional)
-    - export_smiles: Si True, devuelve lista de SMILES
-    - export_xyz: Si True, devuelve bloque XYZ
+    - molecule_id: ID de la molécula (opcional si se proporcionan fragmentos)
+    - bonds_idx: Lista de índices de enlaces (opcional si se proporcionan fragmentos)
+    - export_smiles: Indica si se debe exportar la lista de SMILES de los fragmentos
+    - export_xyz: Indica si se debe exportar el bloque XYZ de los fragmentos
     """
     smiles: str
-    molecule_id: str
-    bond_idx: Optional[int] = None
+    molecule_id: str 
+    bonds_idx: List[int] | None 
     export_smiles: bool = False
     export_xyz: bool = False
-    @model_validator(mode='before')
     @classmethod
-    def _validate_export_options(cls, data: Any) -> Any:
-        if not data.get('export_smiles') and not data.get('export_xyz'):
-            raise ValueError("Debe seleccionarse al menos export_smiles o export_xyz")
-        return data
-    
-class BDEValues(BaseModel):
-    """
-    Representa los valores de BDE para un enlace.
-    - idx: Índice del enlace
-    - bde: Valor de BDE
-    """
-    idx: int
-    bde: float | None  # Puede ser None si no se pudo calcular el BDE
+    def validate(cls, value):
+        if not value.get('fragments') and not value.get('molecule_id'):
+            raise ValueError("should provide 'fragments' or 'molecule_id'")
+        return value
 class FragmentResponseData(BaseModel):
     """
     Salida de /fragment/.
-    - bde_values: Lista de objetos bde_values
-    - smiles_canonical: SMILES canónico
+    - smiles_canonical: SMILES canónico de la molécula original
     - molecule_id: ID de la molécula
-    - bonds: Lista de enlaces evaluados
-    - smiles_list: Lista de SMILES (opcional)
-    - xyz_block: Cadena XYZ (opcional)
+    - bonds_predicted: Lista de enlaces predichos
+    - smiles_list: Lista de SMILES de los fragmentos (opcional)
+    - xyz_block: Bloque XYZ de los fragmentos (opcional)
     """
-    bde_values: List[BDEValues] = Field(..., description="Lista de objetos BDEValues")
     smiles_canonical: str
     molecule_id: str
-    bonds: List[EvaluatedFragmentBond]
+    bonds_predicted: List[PredictedBond]
     smiles_list: Optional[List[str]] = None
     xyz_block: Optional[str] = None
+
 # --- /predict/check/ ---
 class PredictCheckRequest(BaseModel):
     """
@@ -286,3 +266,30 @@ class DownloadReportResponseData(BaseModel):
     """
     type: Literal["pdf", "txt"] = "pdf"
     report_base64: str
+    
+# --- /ObtainBDEFragments/ ---
+class Fragments(BaseModel):
+    """Fragmentos de la molécula."""
+    Smile1: str
+    Smile2: str
+class ObtainBDEFragmentsRequest(BaseModel):
+    """
+    Entrada para /ObtainBDEFragments/.
+    - smiles: SMILES de la molécula
+    - fragments: Fragmentos de la molécula
+    """
+    smiles: str
+    fragments: Fragments
+    
+class ObtainBDEFragmentsResponseData(BaseModel):
+    """
+    Salida de /ObtainBDEFragments/.
+    - smiles_canonical: SMILES canónico de la molécula original
+    - molecule_id: ID de la molécula
+    - bonds_predicted: Lista de enlaces predichos
+    - fragments: Fragmentos de la molécula
+    """
+    smiles_canonical: str
+    molecule_id: str
+    bonds_predicted: PredictedBond
+    fragments: Fragments
