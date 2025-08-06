@@ -146,7 +146,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ========== CONFIGURACIÓN CORS ==========
-# Permitir todos los orígenes cuando DEBUG=True (solo desarrollo)
+# Permitir todos los orígenes cuando CORS_ALLOW_ALL_ORIGINS=True (solo desarrollo)
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 
 # Orígenes permitidos en entornos staging/producción

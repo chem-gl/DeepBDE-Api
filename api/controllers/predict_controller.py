@@ -624,17 +624,17 @@ def bde_valuate_controller(request: BDEEvaluateRequest) -> FragmentResponseData:
     
     # Inicializar archivos de salida con el SMILES/XYZ original al inicio
     if request.export_smiles and smiles_list is not None:
-        smiles_list.append(f"Original molecule: {request.smiles}")
-        smiles_list.append("")  # Salto de línea 1
-        smiles_list.append("")  # Salto de línea 2
-        smiles_list.append("")  # Salto de línea 3
+        smiles_list.append(f"Molecule SMILES: {request.smiles}")
+        smiles_list.append("#")  # Salto de línea 1
+        smiles_list.append("=======================================================")  # Salto de línea 2
+        smiles_list.append("#")  # Salto de línea 3
     
     if request.export_xyz and xyz_blocks is not None:
-        xyz_blocks.append("Original molecule:")
+        xyz_blocks.append("Molecule XYZ:")
         xyz_blocks.append(get_xyz_block(request.smiles))
-        xyz_blocks.append("")  # Salto de línea 1
-        xyz_blocks.append("")  # Salto de línea 2
-        xyz_blocks.append("")  # Salto de línea 3
+        xyz_blocks.append("#")  # Salto de línea 1
+        xyz_blocks.append("========================================================")  # Salto de línea 2
+        xyz_blocks.append("#")  # Salto de línea 3
     
     for bond_idx in bonds_to_process:
         bond = mol.GetBondWithIdx(bond_idx)
@@ -661,27 +661,34 @@ def bde_valuate_controller(request: BDEEvaluateRequest) -> FragmentResponseData:
         # 5. Generar información de exportación para TODOS los enlaces
         if request.export_smiles and smiles_list is not None:
             if bde is not None:
-                smiles_list.append(f"BDE: {bde:.2f} kcal/mol (Bond {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()})")
-                smiles_list.append("")  # Espacio en blanco
                 fragments = get_fragments_from_bond(mol, bond_idx)
-                smiles_list.extend([f"{frag}" for frag in fragments])
+                smiles_list.append(f"IDX: {bond_idx} | ATOMS: {begin_idx}-{end_idx} | BDE: {bde}")
+                if len(fragments) >= 2:
+                    smiles_list.append(f"F1:  {fragments[0]}")
+                    smiles_list.append(f"F2:  {fragments[1]}")
+                else:
+                    smiles_list.append("F1:  [ERROR]")
+                    smiles_list.append("F2:  [ERROR]")
             else:
-                smiles_list.append(f"BDE: Not fragmentable (Bond {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()} - {bond.GetBondType().name.lower()} bond)")
-                smiles_list.append("")  # Espacio en blanco
-                smiles_list.append("No fragments generated (bond is not single or is in ring)")
+                smiles_list.append(f"IDX: {bond_idx} | ATOMS: {begin_idx}-{end_idx} | BDE: Not fragmentable")
+                smiles_list.append("F1:  No fragments generated")
+                smiles_list.append("F2:  (bond is not single or is in ring)")
             smiles_list.append("")  # Línea en blanco para separar entre enlaces
         
         if request.export_xyz and xyz_blocks is not None:
             if bde is not None:
-                xyz_blocks.append(f"BDE: {bde:.2f} kcal/mol (Bond {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()})")
-                xyz_blocks.append("")  # Espacio en blanco
                 fragments = get_fragments_from_bond(mol, bond_idx)
-                for i, frag in enumerate(fragments):
-                    xyz_blocks.append(get_xyz_block(frag))
+                xyz_blocks.append(f"IDX: {bond_idx} | ATOMS: {begin_idx}-{end_idx} | BDE: {bde}")
+                if len(fragments) >= 2:
+                    xyz_blocks.append(f"F1:  {get_xyz_block(fragments[0])}")
+                    xyz_blocks.append(f"F2:  {get_xyz_block(fragments[1])}")
+                else:
+                    xyz_blocks.append("F1:  [ERROR]")
+                    xyz_blocks.append("F2:  [ERROR]")
             else:
-                xyz_blocks.append(f"BDE: Not fragmentable (Bond {bond_idx}: {atom1.GetSymbol()}-{atom2.GetSymbol()} - {bond.GetBondType().name.lower()} bond)")
-                xyz_blocks.append("")  # Espacio en blanco
-                xyz_blocks.append("No fragments generated (bond is not single or is in ring)")
+                xyz_blocks.append(f"IDX: {bond_idx} | ATOMS: {begin_idx}-{end_idx} | BDE: Not fragmentable")
+                xyz_blocks.append("F1:  No fragments generated")
+                xyz_blocks.append("F2:  (bond is not single or is in ring)")
             xyz_blocks.append("")  # Línea en blanco para separar entre enlaces
     xyz_block = "\n".join(xyz_blocks) if xyz_blocks is not None else None
     result = FragmentResponseData(
