@@ -214,7 +214,7 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
         if b_idx < 0 or b_idx >= mol.GetNumBonds():
             continue
         bde = bde_map.get(b_idx, None)
-        label = f"{float(bde):.2f}" if isinstance(bde, (float, int)) else ""
+        label = f"{float(bde):.1f}" if isinstance(bde, (float, int)) else ""
 
         bond = mol.GetBondWithIdx(b_idx)
         a1 = bond.GetBeginAtomIdx()
@@ -243,7 +243,7 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
                 f"<rect x='{x}' y='{y}' width='{w}' height='{h}' "
                 f"fill='white' fill-opacity='0.0' stroke='none' />"
                 f"<text x='{cx}' y='{cy + 1}' text-anchor='middle' dominant-baseline='middle' "
-                f"font-family='Arial, sans-serif' font-size='4' fill='blue' font-weight='normal'>{label}</text>"
+                f"font-family='Arial, sans-serif' font-size='3' fill='blue' font-weight='normal'>{label}</text>"
             )
             overlays.append(overlay)
 
