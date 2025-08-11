@@ -800,7 +800,7 @@ def bde_valuate_controller(request: BDEEvaluateRequest) -> FragmentResponseData:
                 smiles_list.append(f"IDX: {bond_idx} | ATOMS: {begin_idx}-{end_idx} | BDE: Not fragmentable")
                 smiles_list.append("F1:  No fragments generated")
                 smiles_list.append("F2:  (bond is not single or is in ring)")
-            smiles_list.append("")  # Línea en blanco para separar entre enlaces
+            smiles_list.append("##")  # Línea en blanco para separar entre enlaces
         
         if request.export_xyz and xyz_blocks is not None:
             if bde is not None:
@@ -816,7 +816,7 @@ def bde_valuate_controller(request: BDEEvaluateRequest) -> FragmentResponseData:
                 xyz_blocks.append(f"IDX: {bond_idx} | ATOMS: {begin_idx}-{end_idx} | BDE: Not fragmentable")
                 xyz_blocks.append("F1:  No fragments generated")
                 xyz_blocks.append("F2:  (bond is not single or is in ring)")
-            xyz_blocks.append("")  # Línea en blanco para separar entre enlaces
+            xyz_blocks.append("##")  # Línea en blanco para separar entre enlaces
     xyz_block = "\n".join(xyz_blocks) if xyz_blocks is not None else None
 
     # Etiquetar en la imagen el mismo conjunto que se procesó:
