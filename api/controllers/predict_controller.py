@@ -16,6 +16,12 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import rdMolDraw2D
 import hashlib
+import re  # NEW: SVG sanitization
+# NUEVO: para anotar posiciones en el lienzo
+from rdkit.Geometry import rdGeometry
+# NEW: robust XML sanitization
+import io
+import xml.etree.ElementTree as ET
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -114,6 +120,54 @@ def calculate_canvas_size(mol: Chem.Mol, padding: int = 50, min_size: int = 300)
     width = int(max_x - min_x) + padding# type: ignore[attr-defined]
     height = int(max_y - min_y) + padding# type: ignore[attr-defined]
     return {"width": max(width, min_size), "height": max(height, min_size)}
+
+# REPLACE: sanitize RDKit SVG to standard <svg xmlns="http://www.w3.org/2000/svg"> without ns0/svg prefixes
+def sanitize_svg_text(svg: str) -> str:
+    s = svg.strip()
+    # Try robust namespace stripping via ElementTree
+    try:
+        it = ET.iterparse(io.StringIO(s))
+        for _, el in it:
+            # Strip namespaces from tag
+            if isinstance(el.tag, str) and el.tag.startswith('{'):
+                el.tag = el.tag.split('}', 1)[1]
+            # Strip namespaces from attributes
+            if el.attrib:
+                new_attrib = {}
+                for k, v in el.attrib.items():
+                    if isinstance(k, str) and k.startswith('{'):
+                        k = k.split('}', 1)[1]
+                    new_attrib[k] = v
+                el.attrib.clear()
+                el.attrib.update(new_attrib)
+        root = it.root  # type: ignore
+        out = ET.tostring(root, encoding='unicode')
+        # Ensure default SVG namespace on root
+        if 'xmlns=' not in out:
+            out = re.sub(r'<svg\b', '<svg xmlns="http://www.w3.org/2000/svg"', out, count=1)
+        # Single-line
+        out = ''.join(out.splitlines()).strip()
+        # NEW: unescape escaped quotes/newlines if present
+        out = out.replace('\\"', '"').replace("\\'", "'").replace("\\n", "")
+        # NUEVO: usar comillas simples en atributos para evitar escapes en JSON
+        out = re.sub(r'="([^"]*)"', r"='\1'", out)
+        return out
+    except Exception:
+        # Fallback to regex-based cleanup
+        s = re.sub(r'<(/?)ns\d+:', r'<\1', s)              # <ns0:tag> -> <tag>, </ns0:tag> -> </tag>
+        s = re.sub(r'<svg:svg\b', '<svg', s)               # <svg:svg> -> <svg>
+        s = s.replace('</svg:svg>', '</svg>')              # </svg:svg> -> </svg>
+        s = re.sub(r'\s+xmlns:ns\d+="[^"]*"', '', s)       # remove xmlns:nsX="..."
+        s = re.sub(r'\s+xmlns:svg="[^"]*"', '', s)         # remove xmlns:svg="..."
+        if 'xmlns=' not in s:
+            s = s.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"', 1)
+        s = ''.join(s.splitlines()).strip()
+        # NEW: unescape escaped quotes/newlines if present
+        s = s.replace('\\"', '"').replace("\\'", "'").replace("\\n", "")
+        # NUEVO: usar comillas simples en atributos para evitar escapes en JSON
+        s = re.sub(r'="([^"]*)"', r"='\1'", s)
+        return s
+
 def generate_molecule_svg(mol: Chem.Mol, canvas: Dict[str, int]) -> Tuple[str, rdMolDraw2D.MolDraw2DSVG]:
     """Generates an SVG representation of the molecule with atom and bond indices in the default color.
     Args:
@@ -132,8 +186,81 @@ def generate_molecule_svg(mol: Chem.Mol, canvas: Dict[str, int]) -> Tuple[str, r
     drawer.DrawMolecule(mol)# type: ignore[attr-defined]
     drawer.FinishDrawing()
     raw_svg = drawer.GetDrawingText()
-    return ''.join(line.strip() for line in raw_svg.splitlines()), drawer
-ignore_missing_imports = True
+
+    return sanitize_svg_text(raw_svg), drawer
+
+def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map: Dict[int, float | None]) -> Tuple[str, Dict[str, int]]:
+    """
+    Dibuja la molécula y anota sobre el lienzo únicamente los enlaces solicitados,
+    mostrando el BDE en un recuadro encima del enlace (sin índices de enlace).
+    """
+    # Asegurar coords 2D y tamaño del canvas
+    AllChem.Compute2DCoords(mol)  # pyright: ignore[reportAttributeAccessIssue]
+    canvas = calculate_canvas_size(mol)
+
+    drawer = rdMolDraw2D.MolDraw2DSVG(canvas["width"], canvas["height"])
+    opts = drawer.drawOptions()
+    opts.addStereoAnnotation = True
+    opts.explicitMethyl = True
+    opts.includeAtomTags = True
+    opts.addAtomIndices = True
+    opts.addBondIndices = False  # No mostrar índices de enlace
+
+    drawer.DrawMolecule(mol)  # type: ignore[attr-defined]
+
+    # Construir overlays de BDE (rect + text) para mayor legibilidad
+    overlays: list[str] = []
+    for b_idx in bonds_to_label or []:
+        if b_idx < 0 or b_idx >= mol.GetNumBonds():
+            continue
+        bde = bde_map.get(b_idx, None)
+        label = f"{float(bde):.2f}" if isinstance(bde, (float, int)) else "NA"
+
+        bond = mol.GetBondWithIdx(b_idx)
+        a1 = bond.GetBeginAtomIdx()
+        a2 = bond.GetEndAtomIdx()
+        p1 = drawer.GetDrawCoords(a1)
+        p2 = drawer.GetDrawCoords(a2)
+
+        # Punto medio del enlace
+        mx, my = (p1.x + p2.x) / 2.0, (p1.y + p2.y) / 2.0
+
+        # Desplazar un poco en la normal del enlace para no tapar la línea
+        vx, vy = (p2.x - p1.x), (p2.y - p1.y)
+        norm = (vx**2 + vy**2) ** 0.5 or 1.0
+        nx, ny = -vy / norm, vx / norm  # normal
+        off = 6.0
+        cx, cy = mx + nx * off, my + ny * off  # centro del label
+
+        # Tamaño del rectángulo en función del texto
+        w = max(30, 6 * len(label))  # ancho aproximado
+        h = 12
+        x = cx - w / 2
+        y = cy - h / 2
+
+        # Rectángulo de fondo y texto centrado (comillas simples para evitar escapes en JSON)
+        overlay = (
+            f"<rect x='{x}' y='{y}' width='{w}' height='{h}' "
+            f"fill='white' fill-opacity='0.8' stroke='none' />"
+            f"<text x='{cx}' y='{cy + 1}' text-anchor='middle' dominant-baseline='middle' "
+            f"font-family='Arial, sans-serif' font-size='10' fill='green' font-weight='bold'>{label}</text>"
+        )
+        overlays.append(overlay)
+
+    drawer.FinishDrawing()
+    raw_svg = drawer.GetDrawingText()
+
+    # Sanitizar y luego insertar overlays antes del cierre </svg>
+    svg_clean = sanitize_svg_text(raw_svg)
+    if overlays:
+        insertion = "".join(overlays)
+        end = svg_clean.rfind("</svg>")
+        if end != -1:
+            svg_clean = svg_clean[:end] + insertion + svg_clean[end:]
+    # NUEVO: re-sanitizar para normalizar comillas y namespaces también en overlays
+    svg_clean = sanitize_svg_text(svg_clean)
+    return svg_clean, canvas
+
 def get_atoms_info(mol: Chem.Mol, drawer: rdMolDraw2D.MolDraw2DSVG) -> Dict[str, Atom2D]:
     """Extracts atom information from the molecule.
     Args:
@@ -691,127 +818,23 @@ def bde_valuate_controller(request: BDEEvaluateRequest) -> FragmentResponseData:
                 xyz_blocks.append("F2:  (bond is not single or is in ring)")
             xyz_blocks.append("")  # Línea en blanco para separar entre enlaces
     xyz_block = "\n".join(xyz_blocks) if xyz_blocks is not None else None
+
+    # Etiquetar en la imagen el mismo conjunto que se procesó:
+    # - Si el request no trae índices -> todos
+    # - Si trae índices -> solo esos
+    bonds_to_label = bonds_to_process
+    bde_map = {pb.idx: pb.bde for pb in bonds_predicted if pb.idx in set(bonds_to_label)}
+    image_svg, canvas = generate_bde_svg_for_bonds(all_info.mol, bonds_to_label, bde_map)
+
     result = FragmentResponseData(
         smiles_canonical=all_info.smiles_canonical,
         molecule_id=all_info.molecule_id,
         bonds_predicted=bonds_predicted,
         smiles_list=smiles_list,
-        xyz_block=xyz_block
+        xyz_block=xyz_block,
+        image_svg=image_svg,
+        canvas=canvas
     )
-    # Guardar en caché
-    cache_set(cache_key, result)
-    return result
-
-def obtain_bde_fragments_controller(request: ObtainBDEFragmentsRequest) -> ObtainBDEFragmentsResponseData:
-    """
-    Controller para obtener el BDE de un enlace basado en los fragmentos proporcionados.
-    
-    Verifica si los fragmentos dados pueden generarse a partir de la molécula principal
-    y encuentra el enlace que los genera para calcular su BDE.
-    
-    Args:
-        request (ObtainBDEFragmentsRequest): Contiene SMILES y fragmentos esperados.
-    
-    Returns:
-        ObtainBDEFragmentsResponseData: Respuesta con el enlace que genera los fragmentos y su BDE.
-    """
-    # Construir clave de caché
-    cache_key = f"obtain_{request.smiles}_{request.fragments.Smile1}_{request.fragments.Smile2}"
-    cached = cache_get(cache_key)
-    if cached is not None:
-        return cached
-    
-    # 1. Obtener información de la molécula
-    all_info = get_all_info_molecule(request.smiles)
-    mol = all_info.mol
-    
-    # 2. Normalizar los SMILES de los fragmentos de entrada
-    try:
-        fragment1_mol = Chem.MolFromSmiles(request.fragments.Smile1)
-        fragment2_mol = Chem.MolFromSmiles(request.fragments.Smile2)
-        
-        if fragment1_mol is None or fragment2_mol is None:
-            raise ValueError("One or both fragments are invalid SMILES")
-            
-        # Obtener SMILES canónicos de los fragmentos de entrada
-        fragment1_canonical = Chem.MolToSmiles(fragment1_mol, canonical=True)
-        fragment2_canonical = Chem.MolToSmiles(fragment2_mol, canonical=True)
-        input_fragments_set = {fragment1_canonical, fragment2_canonical}
-        
-    except Exception as e:
-        raise ValueError(f"Invalid fragment SMILES: {e}")
-    
-    # 3. Buscar el enlace que genera estos fragmentos
-    matching_bond_idx = None
-    matching_bde = None
-    
-    for bond in mol.GetBonds():
-        bond_idx = bond.GetIdx()
-        
-        # Solo verificar enlaces fragmentables (simples, no cíclicos)
-        if not is_valid_for_bde(all_info.mol, bond_idx):
-            continue
-            
-        # Obtener fragmentos generados por este enlace
-        generated_fragments = get_fragments_from_bond(mol, bond_idx)
-        
-        if len(generated_fragments) == 2:
-            # Normalizar fragmentos generados
-            try:
-                gen_frag1_mol = Chem.MolFromSmiles(generated_fragments[0])
-                gen_frag2_mol = Chem.MolFromSmiles(generated_fragments[1])
-                
-                if gen_frag1_mol is None or gen_frag2_mol is None:
-                    continue
-                    
-                gen_frag1_canonical = Chem.MolToSmiles(gen_frag1_mol, canonical=True)
-                gen_frag2_canonical = Chem.MolToSmiles(gen_frag2_mol, canonical=True)
-                generated_fragments_set = {gen_frag1_canonical, gen_frag2_canonical}
-                
-                # Verificar si los fragmentos coinciden
-                if input_fragments_set == generated_fragments_set:
-                    matching_bond_idx = bond_idx
-                    matching_bde = get_bde_for_bond_indices(all_info, bond_idx)
-                    break
-                    
-            except Exception:
-                continue
-    
-    # 4. Verificar si se encontró un enlace coincidente
-    if matching_bond_idx is None:
-        raise ValueError(f"No bond found that generates the specified fragments: {request.fragments.Smile1} and {request.fragments.Smile2}. The provided fragments do not match any bond fragmentation in the molecule.")
-    
-    # 5. Crear la respuesta con información del enlace encontrado
-    bond = mol.GetBondWithIdx(matching_bond_idx)
-    begin_idx = bond.GetBeginAtomIdx()
-    end_idx = bond.GetEndAtomIdx()
-    atom1 = mol.GetAtomWithIdx(begin_idx)
-    atom2 = mol.GetAtomWithIdx(end_idx)
-    
-    predicted_bond = PredictedBond(
-        idx=matching_bond_idx,
-        bde=matching_bde,
-        begin_atom_idx=begin_idx,
-        end_atom_idx=end_idx,
-        bond_atoms=f"{atom1.GetSymbol()}-{atom2.GetSymbol()}",
-        bond_type=bond.GetBondType().name.lower(),
-        is_fragmentable=(matching_bde is not None)
-    )
-    
-    # 6. Crear fragmentos normalizados para la respuesta
-    from api.model.dto import Fragments
-    normalized_fragments = Fragments(
-        Smile1=fragment1_canonical,
-        Smile2=fragment2_canonical
-    )
-    
-    result = ObtainBDEFragmentsResponseData(
-        smiles_canonical=all_info.smiles_canonical,
-        molecule_id=all_info.molecule_id,
-        bonds_predicted=predicted_bond,
-        fragments=normalized_fragments
-    )
-    
     # Guardar en caché
     cache_set(cache_key, result)
     return result

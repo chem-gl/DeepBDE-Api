@@ -153,7 +153,6 @@ class PredictMultipleResponseData(BaseModel):
     bonds: List[PredictedBond]
     
 
-# --- /fragment/ ---
 class BDEEvaluateRequest(BaseModel):
     """
     Entrada para /fragment/.
@@ -181,12 +180,17 @@ class FragmentResponseData(BaseModel):
     - bonds_predicted: Lista de enlaces predichos
     - smiles_list: Lista de SMILES de los fragmentos (opcional)
     - xyz_block: Bloque XYZ de los fragmentos (opcional)
+    - image_svg: Imagen SVG con valores BDE
+    - canvas: Información del lienzo
     """
     smiles_canonical: str
     molecule_id: str
     bonds_predicted: List[PredictedBond]
     smiles_list: Optional[List[str]] = None
     xyz_block: Optional[str] = None
+    image_svg: str
+    canvas: Dict[str, int]
+    
 
 # --- /predict/check/ ---
 class PredictCheckRequest(BaseModel):
@@ -293,3 +297,5 @@ class ObtainBDEFragmentsResponseData(BaseModel):
     molecule_id: str
     bonds_predicted: PredictedBond
     fragments: Fragments
+    image_svg: str
+    canvas: Dict[str, int]

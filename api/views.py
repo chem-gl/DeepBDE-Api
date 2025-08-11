@@ -4,12 +4,12 @@ from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from rest_framework.views import APIView
 from pydantic import ValidationError
 from api.controllers.predict_controller import (
-     molecule_info_controller, molecule_smile_canonical_controller, obtain_bde_fragments_controller, predict_single_controller, predict_multiple_controller,
+     molecule_info_controller, molecule_smile_canonical_controller, predict_single_controller, predict_multiple_controller,
     bde_valuate_controller, predict_check_controller, infer_all_controller,
     download_report_controller
 )
 from .model.dto import (
-    Atom2D, Bond2D, Fragments,  MoleculeInfoRequest, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, ObtainBDEFragmentsResponseData, ObtainBDEFragmentsRequest, PredictSingleRequest, PredictMultipleRequest,
+    Atom2D, Bond2D, Fragments,  MoleculeInfoRequest, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, PredictSingleRequest, PredictMultipleRequest,
     BDEEvaluateRequest, InferAllRequest, DownloadReportRequest, PredictCheckRequest,
     MoleculeInfoResponseData, PredictSingleResponseData, PredictMultipleResponseData,
     FragmentResponseData, InferAllResponseData, DownloadReportResponseData, PredictCheckResponseData,
@@ -363,7 +363,9 @@ class BDEEvaluateView(APIView):
         data=FragmentResponseData(
             smiles_canonical="CCO",
             molecule_id="a1b2c3d4e5f6a7b8",
-            bonds_predicted=[]
+            bonds_predicted=[],
+            canvas={"width": 300, "height": 300},
+            image_svg="<svg>...</svg>",
         )
     ).model_dump()
     exampleRequest = BDEEvaluateRequest(
@@ -426,86 +428,7 @@ class BDEEvaluateView(APIView):
             return Response(resp.model_dump())
         except ValidationError as e:
             return _handle_validation_error(e)
-class ObtainBDEFragments(APIView):
-    """
-    Endpoint para obtener  BDE a partir de una molécula  y sus fragmentos.
-    """
-    ExampleRequest: ObtainBDEFragmentsRequest = ObtainBDEFragmentsRequest(
-        smiles="CCO",
-        fragments=Fragments(Smile1="C", Smile2="O")
-    )
-    example1 = APIResponse[ObtainBDEFragmentsResponseData](
-        status="success",
-        data=ObtainBDEFragmentsResponseData(
-            smiles_canonical="CCO",
-            molecule_id="a1b2c3d4e5f6a7b8",
-            bonds_predicted= PredictedBond(
-                idx=1,
-                bde=95.0,
-                begin_atom_idx=0,
-                end_atom_idx=1,
-                bond_atoms="C-O",
-                bond_type="single",
-                is_fragmentable=True
-            ),
-            fragments=Fragments(Smile1="C", Smile2="O")  # Provide a Fragments object or appropriate value
-        )
-    ).model_dump()
-    @extend_schema(
-        description="""
-        Obtiene la energía de disociación de enlaces para una molécula basada en SMILES y los fragmentos proporcionados.
-        Obtains the dissociation energy of bonds for a molecule based on SMILES and provided fragments.
-        """,
-        request=ObtainBDEFragmentsRequest,
-        responses={
-            200: OpenApiResponse(
-                response=ObtainBDEFragmentsResponseData,
-                description="Respuesta exitosa / Successful response",
-                examples=[
-                    OpenApiExample(
-                        name="Ejemplo exitoso",
-                        value=example1,
-                        response_only=True
-                    )
-                ]
-            ),
-            400: OpenApiResponse(
-                response=ErrorResponse,
-                description="Error de validación / Validation error",
-                examples=[
-                    OpenApiExample(
-                        name="Error por SMILES inválido",
-                        value={
-                            "status": "error",
-                            "detail": "Formato SMILES inválido"
-                        },
-                        response_only=True
-                    )
-                ]
-            )
-        },
-        examples=[
-            OpenApiExample(
-                "Entrada de ejemplo / Example input",
-                value={"smiles": "CCO", "fragments": {"Smile1": "C", "Smile2": "O"}},
-                request_only=True
-            ),
-            OpenApiExample(
-                "Entrada alternativa / Alternative input",
-                value={"smiles": "C1=CC=CC=C1", "fragments": {"Smile1": "C", "Smile2": "C"}},
-                request_only=True
-            )
-        ]
-    )
-    def post(self, request):
-        try:
-            req = ObtainBDEFragmentsRequest(**request.data)
-            resp_data = obtain_bde_fragments_controller(req)
-            resp = APIResponse[ObtainBDEFragmentsResponseData](status="success", data=resp_data)
-            return Response(resp.model_dump())
-        except ValidationError as e:
-            return _handle_validation_error(e)
-
+ 
 class PredictCheckView(APIView):
     """
     Endpoint para verificar si los productos generados por la escisión de un enlace corresponden a los esperados y predecir la BDE.

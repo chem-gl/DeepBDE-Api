@@ -6,7 +6,7 @@ from typing import Any
 from rdkit import logger
 
 
-CACHE_VERSION = "v4"
+CACHE_VERSION = "v6"
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "_cache", CACHE_VERSION)
 CACHE_DB_PATH = os.path.join(CACHE_DIR, "cache.db")
 os.makedirs(CACHE_DIR, exist_ok=True)
