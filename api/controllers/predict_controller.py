@@ -243,7 +243,7 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
             f"<rect x='{x}' y='{y}' width='{w}' height='{h}' "
             f"fill='white' fill-opacity='0.8' stroke='none' />"
             f"<text x='{cx}' y='{cy + 1}' text-anchor='middle' dominant-baseline='middle' "
-            f"font-family='Arial, sans-serif' font-size='10' fill='green' font-weight='bold'>{label}</text>"
+            f"font-family='Arial, sans-serif' font-size='6' fill='green' font-weight='bold'>{label}</text>"
         )
         overlays.append(overlay)
 
