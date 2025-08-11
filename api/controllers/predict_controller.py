@@ -214,7 +214,7 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
         if b_idx < 0 or b_idx >= mol.GetNumBonds():
             continue
         bde = bde_map.get(b_idx, None)
-        label = f"{float(bde):.2f}" if isinstance(bde, (float, int)) else "NA"
+        label = f"{float(bde):.2f}" if isinstance(bde, (float, int)) else ""
 
         bond = mol.GetBondWithIdx(b_idx)
         a1 = bond.GetBeginAtomIdx()
