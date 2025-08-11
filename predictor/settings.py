@@ -157,6 +157,7 @@ CORS_ALLOWED_ORIGINS = [
 ] or [
     'http://localhost:4200',
     'https://test1.guzman-lopez.com',
+    'https://test2.guzman-lopez.com',
 ]
 
 # Permitir envío de cookies / credenciales
