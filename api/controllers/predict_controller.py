@@ -233,8 +233,8 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
         cx, cy = mx + nx * off, my + ny * off  # centro del label
         if(label != ""):
             # Tamaño del rectángulo en función del texto
-            w = max(30, 6 * len(label))  # ancho aproximado
-            h = 12
+            w = max(15, 6 * len(label))  # ancho aproximado
+            h = 8
             x = cx - w / 2
             y = cy - h / 2
 
@@ -243,7 +243,7 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
                 f"<rect x='{x}' y='{y}' width='{w}' height='{h}' "
                 f"fill='white' fill-opacity='0.6' stroke='none' />"
                 f"<text x='{cx}' y='{cy + 1}' text-anchor='middle' dominant-baseline='middle' "
-                f"font-family='Arial, sans-serif' font-size='5' fill='green' font-weight='normal'>{label}</text>"
+                f"font-family='Arial, sans-serif' font-size='4' fill='green' font-weight='normal'>{label}</text>"
             )
             overlays.append(overlay)
 
