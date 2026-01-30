@@ -1,31 +1,53 @@
-from typing import  cast, Any
 import base64
-from typing import Dict, Tuple
+import hashlib
+
+# NEW: robust XML sanitization
+import io
+import logging
+import re  # NEW: SVG sanitization
+import xml.etree.ElementTree as ET
+from typing import Any, Dict, Tuple, cast
+
+import torch
 from architecture import model
 from attr import dataclass
-import torch
-from api.controllers.cache_controller import cache_get, cache_set, init_cache_db
-from api.model.dto import (
-    Atom2D, Bond2D, MoleculeInfoRequest, MoleculeInfoResponseData, MoleculeSmileCanonicalRequest, MoleculeSmileCanonicalResponseData, ObtainBDEFragmentsRequest, ObtainBDEFragmentsResponseData, PredictSingleRequest, PredictSingleResponseData,
-    PredictMultipleRequest, PredictMultipleResponseData, BDEEvaluateRequest, FragmentResponseData,
-    PredictCheckRequest, PredictCheckResponseData, InferAllRequest, InferAllResponseData,
-    DownloadReportRequest, DownloadReportResponseData, PredictedBond
-)
-import logging
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import rdMolDraw2D
-import hashlib
-import re  # NEW: SVG sanitization
+
 # NUEVO: para anotar posiciones en el lienzo
 from rdkit.Geometry import rdGeometry
-# NEW: robust XML sanitization
-import io
-import xml.etree.ElementTree as ET
+
+from api.controllers.cache_controller import cache_get, cache_set, init_cache_db
+from api.model.dto import (
+    Atom2D,
+    BDEEvaluateRequest,
+    Bond2D,
+    DownloadReportRequest,
+    DownloadReportResponseData,
+    FragmentResponseData,
+    InferAllRequest,
+    InferAllResponseData,
+    MoleculeInfoRequest,
+    MoleculeInfoResponseData,
+    MoleculeSmileCanonicalRequest,
+    MoleculeSmileCanonicalResponseData,
+    ObtainBDEFragmentsRequest,
+    ObtainBDEFragmentsResponseData,
+    PredictCheckRequest,
+    PredictCheckResponseData,
+    PredictedBond,
+    PredictMultipleRequest,
+    PredictMultipleResponseData,
+    PredictSingleRequest,
+    PredictSingleResponseData,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 from deepbde.architecture.inference_util import single_predict
+
+
 @dataclass
 class MoleculeInfo:
     """
@@ -37,6 +59,7 @@ class MoleculeInfo:
     - bonds: Diccionario con información 2D de enlaces
     - image_svg: Representación SVG enriquecida de la molécula
     """
+
     mol: Chem.Mol
     molecule_id: str
     smiles_canonical: str
@@ -62,13 +85,18 @@ def generate_id_smiles(smiles: str) -> Tuple[Chem.Mol, str, str]:
         raise ValueError(f"Invalid SMILES: {smiles}")
     Chem.SanitizeMol(mol)
     mol = Chem.AddHs(mol)
-    smiles_canonical = Chem.MolToSmiles(mol, canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True)
-    mol = Chem.MolFromSmiles(smiles_canonical)  
+    smiles_canonical = Chem.MolToSmiles(
+        mol, canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True
+    )
+    mol = Chem.MolFromSmiles(smiles_canonical)
     Chem.SanitizeMol(mol)
     mol = Chem.AddHs(mol)
-    smiles_canonical = Chem.MolToSmiles(mol, canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True)
+    smiles_canonical = Chem.MolToSmiles(
+        mol, canonical=True, allHsExplicit=True, kekuleSmiles=True, isomericSmiles=True
+    )
     mol_id = hashlib.sha256(smiles_canonical.encode()).hexdigest()[:16]
     return mol, mol_id, smiles_canonical
+
 
 def verify_smiles(smiles: str, mol_id: str) -> bool:
     """
@@ -86,8 +114,12 @@ def verify_smiles(smiles: str, mol_id: str) -> bool:
     except Exception as e:
         raise ValueError(f"Invalid SMILES: '{smiles}'. Error: {e}")
     if mol_id != real_mol_id:
-        raise ValueError(f"Molecule ID does not match. SMILES: '{smiles}', Expected ID: '{real_mol_id}', Received ID: '{mol_id}'")
+        raise ValueError(
+            f"Molecule ID does not match. SMILES: '{smiles}', Expected ID: '{real_mol_id}', Received ID: '{mol_id}'"
+        )
     return True
+
+
 def is_valid_for_bde(mol: MoleculeInfo, bond_idx: int) -> bool:
     """
     Checks if a bond at the given index is a single, non-cyclic bond.
@@ -100,11 +132,17 @@ def is_valid_for_bde(mol: MoleculeInfo, bond_idx: int) -> bool:
     Raises:
         ValueError: If the bond index is out of range.
     """
-    if bond_idx < 0 or bond_idx >= mol.GetNumBonds(): # pyright: ignore[reportAttributeAccessIssue]
-        raise ValueError(f"Bond index {bond_idx} out of range for molecule with {mol.GetNumBonds()} bonds") # pyright: ignore[reportAttributeAccessIssue]
-    bond = mol.GetBondWithIdx(bond_idx) # type: ignore
+    if bond_idx < 0 or bond_idx >= mol.GetNumBonds():  # pyright: ignore[reportAttributeAccessIssue]
+        raise ValueError(
+            f"Bond index {bond_idx} out of range for molecule with {mol.GetNumBonds()} bonds"
+        )  # pyright: ignore[reportAttributeAccessIssue]
+    bond = mol.GetBondWithIdx(bond_idx)  # type: ignore
     return bond.GetBondType() == Chem.BondType.SINGLE and not bond.IsInRing()
-def calculate_canvas_size(mol: Chem.Mol, padding: int = 50, min_size: int = 300) -> Dict[str, int]:
+
+
+def calculate_canvas_size(
+    mol: Chem.Mol, padding: int = 50, min_size: int = 300
+) -> Dict[str, int]:
     """Calculates the canvas size based on the molecule's bounding box.
     Args:
         mol (Chem.Mol): The RDKit molecule object with 2D coordinates.
@@ -114,12 +152,13 @@ def calculate_canvas_size(mol: Chem.Mol, padding: int = 50, min_size: int = 300)
         Dict[str, int]: Dictionary with 'width' and 'height' keys.
     """
     conf = mol.GetConformer()
-    positions = [conf.GetAtomPosition(i) for i in range(mol.GetNumAtoms())]# type: ignore[attr-defined]
-    min_x, max_x = min(pos.x for pos in positions), max(pos.x for pos in positions)# type: ignore[attr-defined]
-    min_y, max_y = min(pos.y for pos in positions), max(pos.y for pos in positions)# type: ignore[attr-defined]
-    width = int(max_x - min_x) + padding# type: ignore[attr-defined]
-    height = int(max_y - min_y) + padding# type: ignore[attr-defined]
+    positions = [conf.GetAtomPosition(i) for i in range(mol.GetNumAtoms())]  # type: ignore[attr-defined]
+    min_x, max_x = min(pos.x for pos in positions), max(pos.x for pos in positions)  # type: ignore[attr-defined]
+    min_y, max_y = min(pos.y for pos in positions), max(pos.y for pos in positions)  # type: ignore[attr-defined]
+    width = int(max_x - min_x) + padding  # type: ignore[attr-defined]
+    height = int(max_y - min_y) + padding  # type: ignore[attr-defined]
     return {"width": max(width, min_size), "height": max(height, min_size)}
+
 
 # REPLACE: sanitize RDKit SVG to standard <svg xmlns="http://www.w3.org/2000/svg"> without ns0/svg prefixes
 def sanitize_svg_text(svg: str) -> str:
@@ -129,24 +168,26 @@ def sanitize_svg_text(svg: str) -> str:
         it = ET.iterparse(io.StringIO(s))
         for _, el in it:
             # Strip namespaces from tag
-            if isinstance(el.tag, str) and el.tag.startswith('{'):
-                el.tag = el.tag.split('}', 1)[1]
+            if isinstance(el.tag, str) and el.tag.startswith("{"):
+                el.tag = el.tag.split("}", 1)[1]
             # Strip namespaces from attributes
             if el.attrib:
                 new_attrib = {}
                 for k, v in el.attrib.items():
-                    if isinstance(k, str) and k.startswith('{'):
-                        k = k.split('}', 1)[1]
+                    if isinstance(k, str) and k.startswith("{"):
+                        k = k.split("}", 1)[1]
                     new_attrib[k] = v
                 el.attrib.clear()
                 el.attrib.update(new_attrib)
         root = it.root  # type: ignore
-        out = ET.tostring(root, encoding='unicode')
+        out = ET.tostring(root, encoding="unicode")
         # Ensure default SVG namespace on root
-        if 'xmlns=' not in out:
-            out = re.sub(r'<svg\b', '<svg xmlns="http://www.w3.org/2000/svg"', out, count=1)
+        if "xmlns=" not in out:
+            out = re.sub(
+                r"<svg\b", '<svg xmlns="http://www.w3.org/2000/svg"', out, count=1
+            )
         # Single-line
-        out = ''.join(out.splitlines()).strip()
+        out = "".join(out.splitlines()).strip()
         # NEW: unescape escaped quotes/newlines if present
         out = out.replace('\\"', '"').replace("\\'", "'").replace("\\n", "")
         # NUEVO: usar comillas simples en atributos para evitar escapes en JSON
@@ -154,21 +195,26 @@ def sanitize_svg_text(svg: str) -> str:
         return out
     except Exception:
         # Fallback to regex-based cleanup
-        s = re.sub(r'<(/?)ns\d+:', r'<\1', s)              # <ns0:tag> -> <tag>, </ns0:tag> -> </tag>
-        s = re.sub(r'<svg:svg\b', '<svg', s)               # <svg:svg> -> <svg>
-        s = s.replace('</svg:svg>', '</svg>')              # </svg:svg> -> </svg>
-        s = re.sub(r'\s+xmlns:ns\d+="[^"]*"', '', s)       # remove xmlns:nsX="..."
-        s = re.sub(r'\s+xmlns:svg="[^"]*"', '', s)         # remove xmlns:svg="..."
-        if 'xmlns=' not in s:
-            s = s.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"', 1)
-        s = ''.join(s.splitlines()).strip()
+        s = re.sub(
+            r"<(/?)ns\d+:", r"<\1", s
+        )  # <ns0:tag> -> <tag>, </ns0:tag> -> </tag>
+        s = re.sub(r"<svg:svg\b", "<svg", s)  # <svg:svg> -> <svg>
+        s = s.replace("</svg:svg>", "</svg>")  # </svg:svg> -> </svg>
+        s = re.sub(r'\s+xmlns:ns\d+="[^"]*"', "", s)  # remove xmlns:nsX="..."
+        s = re.sub(r'\s+xmlns:svg="[^"]*"', "", s)  # remove xmlns:svg="..."
+        if "xmlns=" not in s:
+            s = s.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"', 1)
+        s = "".join(s.splitlines()).strip()
         # NEW: unescape escaped quotes/newlines if present
         s = s.replace('\\"', '"').replace("\\'", "'").replace("\\n", "")
         # NUEVO: usar comillas simples en atributos para evitar escapes en JSON
         s = re.sub(r'="([^"]*)"', r"='\1'", s)
         return s
 
-def generate_molecule_svg(mol: Chem.Mol, canvas: Dict[str, int]) -> Tuple[str, rdMolDraw2D.MolDraw2DSVG]:
+
+def generate_molecule_svg(
+    mol: Chem.Mol, canvas: Dict[str, int]
+) -> Tuple[str, rdMolDraw2D.MolDraw2DSVG]:
     """Generates an SVG representation of the molecule with atom and bond indices in the default color.
     Args:
         mol (Chem.Mol): The RDKit molecule object with 2D coordinates.
@@ -181,13 +227,16 @@ def generate_molecule_svg(mol: Chem.Mol, canvas: Dict[str, int]) -> Tuple[str, r
     opts.addStereoAnnotation = True
     opts.explicitMethyl = True
     opts.includeAtomTags = True
-    opts.addAtomIndices = True  # Enable atom indices in the default color (typically black)
-    opts.addBondIndices = True  # Enable bond indices in the default color (typically black)
-    drawer.DrawMolecule(mol)# type: ignore[attr-defined]
+    opts.addAtomIndices = False  # Desactivar índices de átomos
+    opts.addBondIndices = (
+        True  # Enable bond indices in the default color (typically black)
+    )
+    drawer.DrawMolecule(mol)  # type: ignore[attr-defined]
     drawer.FinishDrawing()
     raw_svg = drawer.GetDrawingText()
 
     return sanitize_svg_text(raw_svg), drawer
+
 
 def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map: Dict[int, float | None]) -> Tuple[str, Dict[str, int]]:
     """
@@ -203,10 +252,19 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
     opts.addStereoAnnotation = True
     opts.explicitMethyl = True
     opts.includeAtomTags = True
-    opts.addAtomIndices = True
+    opts.addAtomIndices = False  # Desactivar índices de átomos
     opts.addBondIndices = False  # No mostrar índices de enlace
 
     drawer.DrawMolecule(mol)  # type: ignore[attr-defined]
+
+    # Calcular tamaño de fuente dinámico basado en el tamaño del canvas y la escala de anotación
+    # RDKit usa annotationFontScale (default ~0.5) relativo al tamaño de fuente base
+    base_font_size = opts.annotationFontScale * 12  # Escala base aproximada
+    # Ajustar según el tamaño del canvas (normalizar a un canvas ~300px)
+    scale_factor = min(canvas["width"], canvas["height"]) / 300.0
+    dynamic_font_size = base_font_size * scale_factor
+    # Limitar tamaño de fuente entre valores razonables
+    dynamic_font_size = max(8, min(dynamic_font_size, 16))
 
     # Construir overlays de BDE (rect + text) para mayor legibilidad
     overlays: list[str] = []
@@ -232,9 +290,12 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
         off = 6.0
         cx, cy = mx + nx * off, my + ny * off  # centro del label
         if(label != ""):
-            # Tamaño del rectángulo en función del texto
-            w = max(15, 6 * len(label))  # ancho aproximado
-            h = 8
+            # Tamaño del rectángulo en función del texto y tamaño de fuente dinámico
+            char_width = dynamic_font_size * 0.6  # Ancho aproximado por carácter
+            w = max(
+                dynamic_font_size * 2, char_width * len(label) + dynamic_font_size * 0.5
+            )  # ancho proporcional
+            h = dynamic_font_size * 1.3  # altura proporcional
             x = cx - w / 2
             y = cy - h / 2
 
@@ -243,7 +304,7 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
                 f"<rect x='{x}' y='{y}' width='{w}' height='{h}' "
                 f"fill='white' fill-opacity='0.0' stroke='none' />"
                 f"<text x='{cx}' y='{cy + 1}' text-anchor='middle' dominant-baseline='middle' "
-                f"font-family='Arial, sans-serif' font-size='3' fill='blue' font-weight='normal'>{label}</text>"
+                f"font-family='Arial, sans-serif' font-size='{dynamic_font_size}' fill='blue' font-weight='normal'>{label}</text>"
             )
             overlays.append(overlay)
 
