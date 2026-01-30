@@ -302,9 +302,9 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
             # Rectángulo de fondo y texto centrado (comillas simples para evitar escapes en JSON)
             overlay = (
                 f"<rect x='{x}' y='{y}' width='{w}' height='{h}' "
-                f"fill='white' fill-opacity='0.0' stroke='none' />"
+                f"fill='white' fill-opacity='0.9' stroke='#1a1a1a' stroke-width='0.3' />"
                 f"<text x='{cx}' y='{cy + 1}' text-anchor='middle' dominant-baseline='middle' "
-                f"font-family='Arial, sans-serif' font-size='{dynamic_font_size}' fill='blue' font-weight='normal'>{label}</text>"
+                f"font-family='Arial, sans-serif' font-size='{dynamic_font_size}' fill='#0033cc' font-weight='bold'>{label}</text>"
             )
             overlays.append(overlay)
 
