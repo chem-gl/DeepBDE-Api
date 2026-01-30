@@ -262,9 +262,9 @@ def generate_bde_svg_for_bonds(mol: Chem.Mol, bonds_to_label: list[int], bde_map
     base_font_size = opts.annotationFontScale * 12  # Escala base aproximada
     # Ajustar según el tamaño del canvas (normalizar a un canvas ~300px)
     scale_factor = min(canvas["width"], canvas["height"]) / 300.0
-    dynamic_font_size = base_font_size * scale_factor
+    dynamic_font_size = base_font_size * scale_factor * 0.75  # 3/4 del tamaño original
     # Limitar tamaño de fuente entre valores razonables
-    dynamic_font_size = max(8, min(dynamic_font_size, 16))
+    dynamic_font_size = max(6, min(dynamic_font_size, 12))
 
     # Construir overlays de BDE (rect + text) para mayor legibilidad
     overlays: list[str] = []
